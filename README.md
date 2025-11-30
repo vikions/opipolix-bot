@@ -6,7 +6,7 @@ across **Opinion** and **Polymarket** (e.g. MetaMask and Base token launch).
 ## Quick start
 
 ```bash
-git clone https://github.com/<your-username>/opipolix-bot.git
+git clone https://github.com/vikions/opipolix-bot.git
 cd opipolix-bot
 python -m venv .venv
 # activate venv
