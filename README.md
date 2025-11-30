@@ -1,7 +1,5 @@
 # 🚀 OpiPoliX Bot
 
-<img src="logo.png" alt="OpiPoliX Logo" width="120"/>
-
 ### 📲 Live Telegram Bot  
 👉 **https://t.me/OpiPoliXBot**
 
@@ -38,7 +36,6 @@ Most traders track token launch rumors via Twitter, Discord, or CT noise.
 
 ## 🚀 Quick Start (Local Dev)
 
-```bash
 git clone https://github.com/vikions/opipolix-bot.git
 cd opipolix-bot
 
@@ -54,6 +51,7 @@ pip install -r requirements.txt
 cp .env.example .env  # Fill in all keys (Telegram, Opinion, Polymarket)
 
 python app/bot.py
+
 🔑 Required Environment Variables
 Create a .env file and set:
 
@@ -68,6 +66,7 @@ HOST=https://proxy.opinion.trade:8443
 CHAIN_ID=56
 
 POLYMARKET_API_KEY=your_polymarket_api_key
+
 📦 Deploy to Production
 We currently run this project using Railway.app (recommended for bots).
 
@@ -82,6 +81,7 @@ Railway automatically runs:
 bash
 Copy code
 python app/bot.py
+
 🌐 Roadmap
 🛒 Enable real trading via APIs (with market attribution)
 
