@@ -9,7 +9,7 @@ from py_clob_client.client import ClobClient
 from py_clob_client.clob_types import MarketOrderArgs, OrderType
 from py_clob_client.order_builder.constants import BUY
 
-from .poly_builder_signing import (
+from poly_builder_signing import (
     BuilderConfig,
     BuilderApiKeyCreds,
     BuilderHeaderPayload,
