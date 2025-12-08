@@ -9,7 +9,14 @@ from py_clob_client.client import ClobClient
 from py_clob_client.clob_types import MarketOrderArgs, OrderType
 from py_clob_client.order_builder.constants import BUY
 
-from py_builder_signing_sdk import BuilderConfig, BuilderApiKeyCreds
+# ⬇️ ВАЖНО: меняем импорт отсюда:
+# from py_builder_signing_sdk import BuilderConfig, BuilderApiKeyCreds
+# ⬇️ На вот это (через подмодуль):
+from py_builder_signing_sdk.builder_config import (
+    BuilderConfig,
+    BuilderApiKeyCreds,
+    RemoteBuilderConfig,  # на будущее, сейчас можно не использовать
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +34,8 @@ POLY_BUILDER_SECRET = os.getenv("POLY_BUILDER_SECRET")
 POLY_BUILDER_PASSPHRASE = os.getenv("POLY_BUILDER_PASSPHRASE")
 
 # Token IDs for YES outcomes (you MUST set them in Railway env!)
-POLY_TOKEN_METAMASK_YES = os.getenv("POLY_TOKEN_METAMASK_YES")  # e.g. "604067-YES-token-id"
-POLY_TOKEN_BASE_YES = os.getenv("POLY_TOKEN_BASE_YES")          # e.g. "598930-YES-token-id"
+POLY_TOKEN_METAMASK_YES = os.getenv("POLY_TOKEN_METAMASK_YES")
+POLY_TOKEN_BASE_YES = os.getenv("POLY_TOKEN_BASE_YES")
 
 
 if not POLY_PK or not POLY_FUNDER:
