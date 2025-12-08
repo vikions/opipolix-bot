@@ -2,3 +2,5 @@ python-telegram-bot==21.4
 python-dotenv
 opinion_clob_sdk
 requests
+py-clob-client
+py-builder-signing-sdk

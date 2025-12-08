@@ -15,6 +15,9 @@ from telegram.ext import (
 from opinion_client import get_simple_markets, get_opinion_binary_prices
 from polymarket_client import get_simple_poly_markets, get_polymarket_binary_prices
 
+# NEW: trading helper with builder attribution
+from polymarket_trader import place_yes_market_order
+
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 # Help Text
@@ -26,10 +29,12 @@ HELP_TEXT = (
     "/about – info about this bot\n"
     "/o_markets – show active Opinion markets\n"
     "/p_markets – show active Polymarket markets\n"
-    "/spread <alias> – spread check (metamask / base)\n\n"
+    "/spread <alias> – spread check (metamask / base)\n"
+    "/poly_buy <alias> <amount> – test Polymarket BUY YES via builder\n\n"
     "Examples:\n"
     "/spread metamask\n"
     "/spread base\n"
+    "/poly_buy metamask 10\n"
 )
 
 # Common markets
@@ -164,9 +169,9 @@ async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     ]
 
     # Spread calculation
-    if op_prices["yes"] and poly_prices["yes"]:
+    if op_prices["yes"] is not None and poly_prices["yes"] is not None:
         lines.append(f"Δ YES (Opinion - Polymarket): {op_prices['yes'] - poly_prices['yes']:.4f}")
-    if op_prices["no"] and poly_prices["no"]:
+    if op_prices["no"] is not None and poly_prices["no"] is not None:
         lines.append(f"Δ NO  (Opinion - Polymarket): {op_prices['no'] - poly_prices['no']:.4f}")
 
     # Errors if exist
@@ -186,6 +191,39 @@ async def spread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "⚠ Usage: /spread <alias>\nExamples:\n/spread metamask\n/spread base"
         )
     await _spread_for_alias(update, context, context.args[0])
+
+
+# NEW: simple trading command for YES via builder-attributed CLOB
+async def poly_buy(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /poly_buy <alias> <amount_usdc>
+    Example: /poly_buy metamask 10
+    """
+    if len(context.args) < 2:
+        return await update.message.reply_text(
+            "Usage: /poly_buy <alias> <amount_usdc>\n"
+            "Examples:\n"
+            "/poly_buy metamask 10\n"
+            "/poly_buy base 5"
+        )
+
+    alias = context.args[0].lower()
+    try:
+        amount = float(context.args[1])
+    except ValueError:
+        return await update.message.reply_text("Amount must be a number, e.g. 10")
+
+    await update.message.reply_text(
+        f"💸 Sending Polymarket BUY YES order via builder\n"
+        f"Market: {alias}\n"
+        f"Size: ~${amount:.2f}"
+    )
+
+    try:
+        resp = place_yes_market_order(alias, amount)
+        await update.message.reply_text(f"✅ Order sent.\nResponse:\n{resp}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error placing order: {e}")
 
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -220,6 +258,7 @@ def main():
     app.add_handler(CommandHandler("o_markets", o_markets))
     app.add_handler(CommandHandler("p_markets", p_markets))
     app.add_handler(CommandHandler("spread", spread))
+    app.add_handler(CommandHandler("poly_buy", poly_buy))  # NEW
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
     app.run_polling()
 
