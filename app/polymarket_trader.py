@@ -9,13 +9,10 @@ from py_clob_client.client import ClobClient
 from py_clob_client.clob_types import MarketOrderArgs, OrderType
 from py_clob_client.order_builder.constants import BUY
 
-# ⬇️ ВАЖНО: меняем импорт отсюда:
-# from py_builder_signing_sdk import BuilderConfig, BuilderApiKeyCreds
-# ⬇️ На вот это (через подмодуль):
-from py_builder_signing_sdk.builder_config import (
+from .poly_builder_signing import (
     BuilderConfig,
     BuilderApiKeyCreds,
-    RemoteBuilderConfig,  # на будущее, сейчас можно не использовать
+    BuilderHeaderPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,15 +22,15 @@ logger = logging.getLogger(__name__)
 POLY_CLOB_HOST = os.getenv("POLY_CLOB_HOST", "https://clob.polymarket.com")
 POLY_CHAIN_ID = int(os.getenv("POLY_CHAIN_ID", "137"))
 
-POLY_PK = os.getenv("POLY_PK")          # private key of wallet that has USDC on Polymarket
-POLY_FUNDER = os.getenv("POLY_FUNDER")  # address that actually holds funds
+POLY_PK = os.getenv("POLY_PK")          # private key of trader wallet
+POLY_FUNDER = os.getenv("POLY_FUNDER")  # address that holds funds (usually same EOA)
 
 # Builder creds (for attribution)
 POLY_BUILDER_API_KEY = os.getenv("POLY_BUILDER_API_KEY")
 POLY_BUILDER_SECRET = os.getenv("POLY_BUILDER_SECRET")
 POLY_BUILDER_PASSPHRASE = os.getenv("POLY_BUILDER_PASSPHRASE")
 
-# Token IDs for YES outcomes (you MUST set them in Railway env!)
+# YES-tokenIDs
 POLY_TOKEN_METAMASK_YES = os.getenv("POLY_TOKEN_METAMASK_YES")
 POLY_TOKEN_BASE_YES = os.getenv("POLY_TOKEN_BASE_YES")
 
@@ -46,7 +43,6 @@ if not (POLY_BUILDER_API_KEY and POLY_BUILDER_SECRET and POLY_BUILDER_PASSPHRASE
 
 
 def _make_builder_config() -> BuilderConfig:
-    """Create BuilderConfig for local signing (attribution)."""
     creds = BuilderApiKeyCreds(
         key=POLY_BUILDER_API_KEY,
         secret=POLY_BUILDER_SECRET,
@@ -60,18 +56,17 @@ def _wrap_session_with_builder(session, builder_config: BuilderConfig):
     Monkey-patch requests.Session.request to automatically inject
     builder headers into EVERY HTTP request to the CLOB.
 
-    This way, py-clob-client делает всё как обычно,
-    а мы просто добавляем POLY_BUILDER_* headers сверху.
+    Так мы получаем POLY_BUILDER_* хедеры на всех запросах,
+    как требует Order Attribution.
     """
     original_request = session.request
 
     def wrapped(method, url, **kwargs):
         headers = kwargs.get("headers") or {}
 
-        # Determine body as JSON string (exactly what we send)
+        # Нормализуем body → строка JSON, как реально уходит на сервер
         body_str = ""
         if "json" in kwargs and kwargs["json"] is not None:
-            # We take JSON dict, make canonical string, send as 'data'
             body_str = json.dumps(kwargs["json"], separators=(",", ":"), sort_keys=True)
             kwargs["data"] = body_str
             kwargs.pop("json", None)
@@ -89,12 +84,15 @@ def _wrap_session_with_builder(session, builder_config: BuilderConfig):
         path = urlparse(url).path
 
         try:
-            builder_headers = builder_config.generate_builder_headers(
+            payload = builder_config.generate_builder_headers(
                 method.upper(),
                 path,
                 body_str,
             )
-            headers.update(builder_headers)
+            if isinstance(payload, BuilderHeaderPayload):
+                headers.update(payload.to_dict())
+            elif isinstance(payload, dict):
+                headers.update(payload)
         except Exception as e:
             logger.warning("Failed to generate builder headers: %s", e)
 
@@ -106,55 +104,48 @@ def _wrap_session_with_builder(session, builder_config: BuilderConfig):
 
 def _create_client() -> ClobClient:
     """
-    Create a single global ClobClient with:
-    - wallet private key (POLY_PK)
-    - funder address (POLY_FUNDER)
+    Create ClobClient with:
+    - POLY_PK (EOA private key)
+    - POLY_FUNDER (address with funds)
     - L2 API creds
-    - Builder attribution via py-builder-signing-sdk
+    - builder attribution via local signing
     """
     client = ClobClient(
         POLY_CLOB_HOST,
         key=POLY_PK,
         chain_id=POLY_CHAIN_ID,
-        # signature_type:
-        # 0 - regular EOA, 1 - email/Magic, 2 - proxy
-        signature_type=0,
+        signature_type=0,  # 0 = regular EOA
         funder=POLY_FUNDER,
     )
 
-    # L2 API creds (required for trading)
+    # L2 API creds – обязательно для торговли
     client.set_api_creds(client.create_or_derive_api_creds())
 
-    # Builder config (local signing)
+    # BuilderConfig для локальной подписи
     builder_config = _make_builder_config()
 
-    # Monkey-patch underlying HTTP session to add builder headers
+    # Monkey-patch HTTP session, чтобы добавлять POLY_BUILDER_* headers
     if hasattr(client, "session"):
         _wrap_session_with_builder(client.session, builder_config)
     else:
-        logger.warning("ClobClient has no 'session' attribute – builder headers might not be attached")
+        logger.warning("ClobClient has no 'session' attribute – builder headers may not be attached")
 
     return client
 
 
-# Single global client
 _client = _create_client()
 
 
 def _resolve_yes_token_id(alias: str) -> str:
-    """
-    Map alias -> YES tokenId using env vars.
-    You MUST fill POLY_TOKEN_METAMASK_YES / POLY_TOKEN_BASE_YES in Railway.
-    """
     alias = alias.lower()
     if alias == "metamask":
         token = POLY_TOKEN_METAMASK_YES
-        if not token or token.startswith("<"):
+        if not token or token.startswith("<") or token.strip() == "":
             raise RuntimeError("POLY_TOKEN_METAMASK_YES is not set correctly")
         return token
     elif alias == "base":
         token = POLY_TOKEN_BASE_YES
-        if not token or token.startswith("<"):
+        if not token or token.startswith("<") or token.strip() == "":
             raise RuntimeError("POLY_TOKEN_BASE_YES is not set correctly")
         return token
     else:
@@ -163,10 +154,10 @@ def _resolve_yes_token_id(alias: str) -> str:
 
 def place_yes_market_order(alias: str, usd_amount: float):
     """
-    Place a MARKET BUY (YES) order for given alias via Polymarket CLOB.
+    Place MARKET BUY YES order with builder attribution.
 
-    - Uses py-clob-client to build & sign order
-    - Underlying HTTP call gets builder attribution headers automatically
+    :param alias: 'metamask' | 'base'
+    :param usd_amount: notional in USDC
     """
     if usd_amount <= 0:
         raise ValueError("usd_amount must be > 0")
@@ -177,10 +168,9 @@ def place_yes_market_order(alias: str, usd_amount: float):
         token_id=token_id,
         amount=float(usd_amount),
         side=BUY,
-        order_type=OrderType.FOK,  # Fill-or-kill market order
+        order_type=OrderType.FOK,
     )
 
     signed = _client.create_market_order(mo)
     resp = _client.post_order(signed, OrderType.FOK)
-
     return resp
