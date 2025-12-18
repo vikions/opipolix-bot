@@ -3,7 +3,7 @@
 ### 📲 Live Telegram Bot  
 👉 **https://t.me/OpiPoliXBot**
 
-OpiPoliX is a real-time Telegram bot that tracks *pricing spreads* for high-impact crypto prediction markets across **Opinion.trade (CLOB)** and **Polymarket**.
+OpiPoliX is a real-time Telegram bo that tracks *pricing spreads* for high-impact crypto prediction markets across **Opinion.trade (CLOB)** and **Polymarket**.
 
 Designed for traders, researchers, and degens who want signal without noise.
 

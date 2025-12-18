@@ -1,6 +1,25 @@
+# Telegram Bot
 python-telegram-bot==21.4
+
+# Environment variables
 python-dotenv
+
+# Opinion trading
 opinion_clob_sdk
+
+# Web3 & Blockchain
+web3==6.11.1
+eth-account
+
+# HTTP requests
 requests
+
+# Polymarket CLOB
 py-clob-client
+
+# Builder signing
 py-builder-signing-sdk
+py-builder-relayer-client
+
+# Encryption
+cryptography

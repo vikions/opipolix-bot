@@ -1,14 +1,42 @@
+# Environment variables (СЕКРЕТЫ!)
+.env
+.env.local
+
+# Database (локальная БД с кошельками!)
+*.db
+opipolix.db
+
 # Python
 __pycache__/
-*.pyc
-.venv/
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+.venv/
+env/
 
-# Env
-.env
-*.env
-
-# Editors
+# IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+temp/
+
+# Node modules (если есть JS скрипты)
+node_modules/
+package-lock.json
+
+# Test files
+test_*.py
+*_test.py
