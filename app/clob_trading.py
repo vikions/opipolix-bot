@@ -34,12 +34,9 @@ class UserClobClient:
         self.telegram_id = telegram_id
         self.private_key = user_private_key
         
-        # Builder config для CLOB (REMOTE SIGNING!)
-        if BUILDER_SIGNING_URL:
-            print("🔐 Using REMOTE builder signing for CLOB")
-            remote_config = RemoteBuilderConfig(url=BUILDER_SIGNING_URL)
-            builder_config = BuilderConfig(remote_builder_config=remote_config)
-        elif BUILDER_API_KEY and BUILDER_SECRET and BUILDER_PASS_PHRASE:
+        # Builder config для CLOB
+        # Используем LOCAL credentials (они уже в .env)
+        if BUILDER_API_KEY and BUILDER_SECRET and BUILDER_PASS_PHRASE:
             print("🔑 Using LOCAL builder credentials for CLOB")
             from py_builder_signing_sdk.config import BuilderApiKeyCreds
             builder_config = BuilderConfig(
@@ -49,6 +46,10 @@ class UserClobClient:
                     passphrase=BUILDER_PASS_PHRASE
                 )
             )
+        elif BUILDER_SIGNING_URL:
+            print("🔐 Using REMOTE builder signing for CLOB")
+            remote_config = RemoteBuilderConfig(url=BUILDER_SIGNING_URL)
+            builder_config = BuilderConfig(remote_builder_config=remote_config)
         else:
             raise ValueError("Builder credentials not configured!")
         
