@@ -23,6 +23,17 @@ from market_config import get_market, get_all_markets, is_market_ready
 from clob_trading import trade_market
 from balance_checker import BalanceChecker
 
+# Auto-Trade imports
+from auto_trade_handlers import (
+    build_auto_trade_keyboard,
+    handle_auto_buy_yes_pump,
+    handle_auto_buy_no_pump,
+    handle_auto_buy_no_dump,
+    handle_pending_auto_trade_input,
+    handle_my_active_orders
+)
+from cancel_order_handler import cancel_auto_order
+
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 # Initialize wallet manager
@@ -126,16 +137,6 @@ def build_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
         [KeyboardButton(f"📊 Sell YES"), KeyboardButton(f"📊 Sell NO")],
         [KeyboardButton("🤖 Auto-Trade"), KeyboardButton("📊 Market Info")],
         [KeyboardButton("🔙 Back to Markets")],
-    ]
-    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
-
-
-def build_auto_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
-    """Клавиатура для Auto-Trade меню"""
-    rows = [
-        [KeyboardButton("📈 Auto-Buy on Pump"), KeyboardButton("📉 Auto-Sell on Dump")],
-        [KeyboardButton("📊 My Active Orders")],
-        [KeyboardButton("🔙 Back to Market")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -830,6 +831,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if text.startswith('/'):
         return
     
+    # НОВОЕ: Проверяем pending_auto_trade (юзер настраивает auto-order)
+    if await handle_pending_auto_trade_input(update, context, text):
+        return
+    
     # Проверяем есть ли pending trade (юзер вводит сумму)
     if context.user_data.get('pending_trade'):
         try:
@@ -1130,47 +1135,18 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     
     # Auto-Trade кнопки
-    if text == "📈 Auto-Buy on Pump":
-        await update.message.reply_text(
-            "🚀 *Auto-Buy on Pump*\n\n"
-            "This feature is coming soon!\n\n"
-            "You'll be able to:\n"
-            "• Set price increase trigger (+5%, +10%, etc)\n"
-            "• Set buy amount\n"
-            "• Automatic execution when trigger hits\n"
-            "• Still gasless!\n\n"
-            "🔍 Stay tuned!",
-            parse_mode="Markdown",
-            reply_markup=build_auto_trade_keyboard(context.user_data.get('auto_trade_market', 'metamask'))
-        )
-        return
+    # Auto-Trade кнопки - НОВЫЕ ОБРАБОТЧИКИ!
+    if text == "📈 Buy YES on Pump":
+        return await handle_auto_buy_yes_pump(update, context)
     
-    if text == "📉 Auto-Sell on Dump":
-        await update.message.reply_text(
-            "📉 *Auto-Sell on Dump*\n\n"
-            "This feature is coming soon!\n\n"
-            "You'll be able to:\n"
-            "• Set price decrease trigger (-10%, -15%, etc)\n"
-            "• Protect your position from dumps\n"
-            "• Automatic execution when trigger hits\n"
-            "• Still gasless!\n\n"
-            "🔍 Stay tuned!",
-            parse_mode="Markdown",
-            reply_markup=build_auto_trade_keyboard(context.user_data.get('auto_trade_market', 'metamask'))
-        )
-        return
+    if text == "🎭 Buy NO on Pump":
+        return await handle_auto_buy_no_pump(update, context)
+    
+    if text == "📉 Buy NO on Dump":
+        return await handle_auto_buy_no_dump(update, context)
     
     if text == "📊 My Active Orders":
-        await update.message.reply_text(
-            "📊 *My Active Auto-Orders*\n\n"
-            "You have no active auto-orders yet.\n\n"
-            "Create one using:\n"
-            "• 📈 Auto-Buy on Pump\n"
-            "• 📉 Auto-Sell on Dump",
-            parse_mode="Markdown",
-            reply_markup=build_auto_trade_keyboard(context.user_data.get('auto_trade_market', 'metamask'))
-        )
-        return
+        return await handle_my_active_orders(update, context)
     
     if text == "🔙 Back to Main Menu":
         await update.message.reply_text(
@@ -1217,6 +1193,7 @@ def main():
     app.add_handler(CommandHandler("wallet", trading_menu))
     app.add_handler(CommandHandler("deploy_safe", deploy_safe_wallet))
     app.add_handler(CommandHandler("withdraw", withdraw_command))
+    app.add_handler(CommandHandler("cancel", cancel_auto_order))
     
     # Обработчик кнопок
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
