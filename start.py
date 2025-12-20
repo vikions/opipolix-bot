@@ -10,6 +10,10 @@ def main():
     # Запускаем оба процесса
     processes = []
     
+    # Передаём все переменные окружения
+    import os
+    env = os.environ.copy()
+    
     # Bot
     print("▶️ Starting bot...", flush=True)
     bot_process = subprocess.Popen(
@@ -18,7 +22,8 @@ def main():
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,  # Line buffered
-        universal_newlines=True
+        universal_newlines=True,
+        env=env  # ← ПЕРЕДАЁМ ENV!
     )
     processes.append(("bot", bot_process))
     
@@ -30,7 +35,8 @@ def main():
         stderr=subprocess.PIPE,
         text=True,
         bufsize=1,  # Line buffered
-        universal_newlines=True
+        universal_newlines=True,
+        env=env  # ← ПЕРЕДАЁМ ENV!
     )
     processes.append(("worker", worker_process))
     
