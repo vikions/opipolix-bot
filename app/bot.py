@@ -21,6 +21,7 @@ from balance_checker import check_user_balance
 from withdraw_manager import withdraw_usdc_from_safe
 from market_config import get_market, get_all_markets, is_market_ready
 from clob_trading import trade_market
+from balance_checker import BalanceChecker
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
@@ -134,6 +135,16 @@ def build_auto_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("📈 Auto-Buy on Pump"), KeyboardButton("📉 Auto-Sell on Dump")],
         [KeyboardButton("📊 My Active Orders")],
+        [KeyboardButton("🔙 Back to Market")],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def build_sell_percentage_keyboard() -> ReplyKeyboardMarkup:
+    """Клавиатура для выбора % продажи"""
+    rows = [
+        [KeyboardButton("25%"), KeyboardButton("50%")],
+        [KeyboardButton("75%"), KeyboardButton("100%")],
         [KeyboardButton("🔙 Back to Market")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -740,8 +751,10 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
             token_id=token_id,
             side=side,
             amount_usdc=amount,
-            telegram_id=telegram_id
+            telegram_id=telegram_id,
+            funder_address=wallet["safe_address"],  # ✅ SAFE как funder
         )
+
         
         if result['status'] == 'success':
             await update.message.reply_text(
@@ -812,6 +825,10 @@ async def auto_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, ma
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик кнопок"""
     text = update.message.text.strip()
+    
+    # Пропускаем команды (handlers обработают их)
+    if text.startswith('/'):
+        return
     
     # Проверяем есть ли pending trade (юзер вводит сумму)
     if context.user_data.get('pending_trade'):
@@ -946,24 +963,39 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             action = "sell"
             outcome = "no"
         
-        # Запрашиваем сумму
-        context.user_data['pending_trade'] = {
-            'market': current_market,
-            'action': action,
-            'outcome': outcome
-        }
-        
         market = get_market(current_market)
-        action_text = "Buy" if action == "buy" else "Sell"
         
-        await update.message.reply_text(
-            f"{market['emoji']} *{market['title']}*\n\n"
-            f"📊 {action_text} {outcome.upper()} shares\n\n"
-            f"💰 How much USDC do you want to spend?\n"
-            f"Send amount like: `10` or `5.5`\n\n"
-            f"⚠️ Minimum: $1 USDC",
-            parse_mode="Markdown"
-        )
+        # Для SELL - показываем % кнопки
+        if action == "sell":
+            # Сохраняем инфо о продаже
+            context.user_data['pending_sell'] = {
+                'market': current_market,
+                'outcome': outcome
+            }
+            
+            await update.message.reply_text(
+                f"{market['emoji']} *{market['title']}*\n\n"
+                f"📊 Sell {outcome.upper()} shares\n\n"
+                f"📉 Choose percentage to sell:",
+                parse_mode="Markdown",
+                reply_markup=build_sell_percentage_keyboard()
+            )
+        else:
+            # Для BUY - запрашиваем сумму как раньше
+            context.user_data['pending_trade'] = {
+                'market': current_market,
+                'action': action,
+                'outcome': outcome
+            }
+            
+            await update.message.reply_text(
+                f"{market['emoji']} *{market['title']}*\n\n"
+                f"📊 Buy {outcome.upper()} shares\n\n"
+                f"💰 How much USDC do you want to spend?\n"
+                f"Send amount like: `10` or `5.5`\n\n"
+                f"⚠️ Minimum: $1 USDC",
+                parse_mode="Markdown"
+            )
         return
     
     # Кнопка Auto-Trade
@@ -978,6 +1010,124 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         
         return await auto_trade_menu(update, context, current_market)
+    
+    # Обработка % кнопок для SELL
+    if text in ["25%", "50%", "75%", "100%"]:
+        pending_sell = context.user_data.get('pending_sell')
+        
+        if not pending_sell:
+            await update.message.reply_text(
+                "❌ No pending sell operation",
+                reply_markup=build_main_keyboard()
+            )
+            return
+        
+        telegram_id = update.message.from_user.id
+        wallet = wallet_manager.get_wallet(telegram_id)
+        
+        if not wallet or not wallet['safe_address']:
+            await update.message.reply_text(
+                "❌ You need a Safe wallet to trade!",
+                reply_markup=build_main_keyboard()
+            )
+            return
+        
+        market_alias = pending_sell['market']
+        outcome = pending_sell['outcome']
+        percentage = int(text.strip('%'))
+        
+        market = get_market(market_alias)
+        token_id = market['tokens'][outcome]
+        
+        await update.message.reply_text(
+            f"🔍 Getting your {outcome.upper()} token balance...\n"
+            f"⏳ Please wait..."
+        )
+        
+        try:
+            # Получаем приватный ключ
+            private_key = wallet_manager.get_private_key(telegram_id)
+            
+            # Получаем баланс токенов через Web3 (KAK В balance_checker!)
+            balance_checker = BalanceChecker()
+            token_balance_raw = balance_checker.get_position_balance(
+                wallet['safe_address'],
+                token_id
+            )
+            
+            # CTF токены имеют 6 decimals (как USDC)
+            token_balance = token_balance_raw / 1e6
+            
+            print(f"📊 Token balance: {token_balance_raw} raw = {token_balance} tokens")
+            
+            if token_balance <= 0:
+                await update.message.reply_text(
+                    f"❌ You have no {outcome.upper()} tokens to sell!\n\n"
+                    f"📊 Current balance: 0",
+                    reply_markup=build_trade_keyboard(market_alias)
+                )
+                context.user_data.pop('pending_sell', None)
+                return
+            
+            # Вычисляем сколько продавать
+            amount_to_sell = (token_balance * percentage) / 100
+            
+            await update.message.reply_text(
+                f"📊 Selling {percentage}% of {outcome.upper()} tokens...\n\n"
+                f"📉 Your balance: {token_balance:.2f} tokens\n"
+                f"💰 Selling: {amount_to_sell:.2f} tokens\n\n"
+                f"⏳ Please wait..."
+            )
+            
+            # Выполняем продажу
+            # Для SELL указываем amount в USDC (примерная стоимость)
+            # Или можно указать amount_to_sell как количество токенов
+            result = trade_market(
+                user_private_key=private_key,
+                token_id=token_id,
+                side="SELL",
+                amount_usdc=amount_to_sell,  # Продаём на эту сумму
+                telegram_id=telegram_id,
+                funder_address=wallet['safe_address']
+            )
+            
+            if result['status'] == 'success':
+                order_id = result.get('order_id', 'N/A')
+                # Если order_id - это dict, берём только ID
+                if isinstance(order_id, dict):
+                    order_id = order_id.get('orderID', str(order_id)[:16])
+                
+                await update.message.reply_text(
+                    f"✅ *Sell Successful!*\n\n"
+                    f"📊 Sold {percentage}% of {outcome.upper()}\n"
+                    f"💰 Amount: {amount_to_sell:.2f} tokens\n\n"
+                    f"🎯 Order ID: `{str(order_id)[:16]}...`\n\n"
+                    f"⚡ Gasless transaction!\n"
+                    f"🏆 Attributed to OpiPoliX!",
+                    parse_mode="Markdown",
+                    reply_markup=build_trade_keyboard(market_alias)
+                )
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                await update.message.reply_text(
+                    f"❌ Sell failed\n\n"
+                    f"Error: {error_msg}\n\n"
+                    f"Please try again.",
+                    reply_markup=build_trade_keyboard(market_alias)
+                )
+            
+        except Exception as e:
+            await update.message.reply_text(
+                f"❌ Error: {str(e)}\n\n"
+                f"Please try again or contact support.",
+                reply_markup=build_trade_keyboard(market_alias)
+            )
+        
+        finally:
+            # Очищаем pending sell
+            context.user_data.pop('pending_sell', None)
+        
+        return
     
     # Auto-Trade кнопки
     if text == "📈 Auto-Buy on Pump":

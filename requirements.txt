@@ -23,3 +23,6 @@ py-builder-relayer-client
 
 # Encryption
 cryptography
+
+# PostgreSQL (for Railway production)
+psycopg2-binary
