@@ -323,7 +323,7 @@ Built by **@vikions**
 
 - Crypto developer & prediction markets enthusiast
 - Telegram: [@OpiPoliXBot](https://t.me/OpiPoliXBot)
-- Twitter: Coming soon
+- Twitter: https://x.com/vikions777
 
 ---
 
@@ -331,9 +331,9 @@ Built by **@vikions**
 
 **Having issues?**
 
-1. Check the [FAQ](#) (coming soon)
+1. Check the [FAQ](#) 
 2. Open an [issue](https://github.com/vikions/opipolix-bot/issues)  
-3. Message [@vikions](https://t.me/vikions) on Telegram
+
 
 ---
 
