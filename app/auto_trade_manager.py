@@ -1,13 +1,10 @@
-"""
-Auto-Trade Manager для OpiPoliX бота
-Управление автоматическими ордерами
-"""
+
 from typing import Dict, Literal
 from database import Database
 
 
 class AutoTradeManager:
-    """Менеджер авто-ордеров"""
+    """Auto-orders manager"""
     
     def __init__(self):
         self.db = Database()
@@ -21,22 +18,22 @@ class AutoTradeManager:
         amount_usdc: float
     ) -> int:
         """
-        Создать авто-ордер
+        Create an auto-order
         
         Args:
-            telegram_id: ID пользователя
-            market_alias: 'metamask' или 'base'
-            order_type: Тип ордера
-                - 'buy_yes_pump': Купить YES при pump
-                - 'buy_no_pump': Купить NO при pump (fake news)
-                - 'buy_no_dump': Купить NO при dump (страховка)
-            trigger_percent: Процент изменения (например 15.0 для +15%)
-            amount_usdc: Сумма в USDC
+            telegram_id: User's Telegram ID
+            market_alias: 'metamask' or 'base'
+            order_type: Order type
+                - 'buy_yes_pump': Buy YES on pump
+                - 'buy_no_pump': Buy NO on pump (fake news)
+                - 'buy_no_dump': Buy NO on dump (safety net)
+            trigger_percent: Percentage change (e.g. 15.0 for +15%)
+            amount_usdc: Amount in USDC
         
         Returns:
-            int: ID созданного ордера
+            int: Created order ID
         """
-        # Определяем side и trigger_type
+        # Determine side and trigger_type
         if order_type == 'buy_yes_pump':
             side = 'BUY'
             outcome = 'YES'
@@ -52,7 +49,7 @@ class AutoTradeManager:
         else:
             raise ValueError(f"Unknown order type: {order_type}")
         
-        # Сохраняем в БД
+        # Save to DB
         order_id = self.db.create_auto_order(
             telegram_id=telegram_id,
             market_alias=market_alias,
@@ -67,32 +64,32 @@ class AutoTradeManager:
         return order_id
     
     def get_user_orders(self, telegram_id: int) -> list:
-        """Получить активные ордера пользователя"""
+        """Get user's active orders"""
         orders = self.db.get_user_auto_orders(telegram_id)
         return orders
     
     def cancel_order(self, order_id: int) -> bool:
-        """Отменить ордер"""
+        """Cancel an order"""
         self.db.update_auto_order_status(order_id, 'cancelled')
         print(f"❌ Cancelled auto-order #{order_id}")
         return True
     
     def format_order_info(self, order: Dict) -> str:
         """
-        Форматировать информацию об ордере для отображения
+        Format order information for display
         
         Args:
-            order: Dict из БД
+            order: Dict from DB
         
         Returns:
-            str: Форматированное описание
+            str: Formatted description
         """
         trigger_type = order['trigger_type']
         trigger_value = order['trigger_value']
         amount = order['amount']
         market = order['market_alias'].title()
         
-        # Парсим тип
+        # Parse type
         if 'pump_YES' in trigger_type:
             emoji = "📈"
             description = f"Buy YES on +{trigger_value}% pump"

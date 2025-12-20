@@ -2,20 +2,12 @@ import requests
 import json
 from typing import List, Dict
 
-# Официальный Gamma endpoint из доки:
-# https://docs.polymarket.com/developers/gamma-markets-api/get-markets
+
 BASE_URL = "https://gamma-api.polymarket.com"
 
 
 def fetch_raw_polymarket_markets(limit: int = 5) -> list:
-    """
-    Тянем рынки с Gamma API Polymarket (GET /markets).
-
-    Используем параметры из доки:
-    - closed=false  → только активные рынки
-    - order=id      → сортировка по id
-    - ascending=false → новые сначала
-    """
+    
     params = {
         "limit": limit,
         "closed": "false",
@@ -27,7 +19,7 @@ def fetch_raw_polymarket_markets(limit: int = 5) -> list:
     resp.raise_for_status()
     data = resp.json()
 
-    # В Gamma /markets обычно возвращает список рынков
+    
     if isinstance(data, list):
         return data
     elif isinstance(data, dict) and "markets" in data:
@@ -36,10 +28,7 @@ def fetch_raw_polymarket_markets(limit: int = 5) -> list:
 
 
 def get_simple_poly_markets(limit: int = 5) -> List[Dict]:
-    """
-    Приводим рынки Polymarket к простому виду:
-    [{'id': ..., 'title': ...}, ...]
-    """
+    
     markets = fetch_raw_polymarket_markets(limit)
     simplified: List[Dict] = []
 
@@ -57,11 +46,7 @@ def get_simple_poly_markets(limit: int = 5) -> List[Dict]:
     return simplified
 
 def get_polymarket_binary_prices(market_id: int) -> Dict[str, float | None]:
-    """
-    Возвращает {'yes': price_or_None, 'no': price_or_None} для бинарного рынка Polymarket.
-    Используем Gamma /markets?id=...
-    Пытаемся вытащить outcomes + outcomePrices.
-    """
+    
     resp = requests.get(
         f"{BASE_URL}/markets",
         params={"id": market_id},
@@ -85,7 +70,7 @@ def get_polymarket_binary_prices(market_id: int) -> Dict[str, float | None]:
     outcomes = m.get("outcomes")
     prices = m.get("outcomePrices")
 
-    # Иногда эти поля могут быть строками с JSON внутри
+    
     if isinstance(outcomes, str):
         try:
             outcomes = json.loads(outcomes)

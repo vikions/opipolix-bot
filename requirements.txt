@@ -7,7 +7,7 @@ python-dotenv
 # Opinion trading
 opinion_clob_sdk
 
-# Web3 & Blockchain (обновлённые версии!)
+
 web3>=7.0.0
 eth-account
 

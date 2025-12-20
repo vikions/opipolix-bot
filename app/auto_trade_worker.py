@@ -1,7 +1,4 @@
-"""
-Auto-Trade Background Worker
-Мониторит цены и исполняет авто-ордера
-"""
+
 import asyncio
 import os
 from typing import Optional
@@ -18,7 +15,7 @@ from clob_trading import trade_market
 
 
 class AutoTradeWorker:
-    """Background worker для выполнения авто-ордеров"""
+    
     
     def __init__(self, telegram_token: str):
         self.db = Database()
@@ -33,7 +30,7 @@ class AutoTradeWorker:
         print("🤖 Auto-Trade Worker initialized!")
     
     async def send_notification(self, telegram_id: int, message: str):
-        """Отправить уведомление пользователю"""
+        
         try:
             await self.bot.send_message(
                 chat_id=telegram_id,
@@ -50,8 +47,7 @@ class AutoTradeWorker:
         max_retries: int = 3
     ) -> dict:
         """
-        Выполнить ордер с retry логикой
-        
+             
         Args:
             order: Dict из БД
             max_retries: Максимум попыток
@@ -64,7 +60,7 @@ class AutoTradeWorker:
         amount_usdc = order['amount']
         trigger_type = order['trigger_type']
         
-        # Определяем какой токен покупать
+       
         if 'YES' in trigger_type:
             outcome = 'yes'
         else:
@@ -73,7 +69,7 @@ class AutoTradeWorker:
         market = get_market(market_alias)
         token_id = market['tokens'][outcome]
         
-        # Получаем wallet
+       
         wallet = self.wallet_manager.get_wallet(telegram_id)
         if not wallet or not wallet['safe_address']:
             return {
@@ -82,20 +78,20 @@ class AutoTradeWorker:
                 'attempts': 0
             }
         
-        # Получаем private key
+        
         private_key = self.wallet_manager.get_private_key(telegram_id)
         
-        # RETRY LOGIC с уменьшением суммы
+        
         for attempt in range(1, max_retries + 1):
-            # Уменьшаем сумму с каждой попыткой
+            
             retry_amount = amount_usdc / (2 ** (attempt - 1))
             
             if retry_amount < 1:
-                retry_amount = 1  # Минимум $1
+                retry_amount = 1  
             
             print(f"🔄 Attempt {attempt}/{max_retries}: Trying ${retry_amount:.2f}")
             
-            # Уведомление о попытке
+            
             if attempt == 1:
                 await self.send_notification(
                     telegram_id,
@@ -113,18 +109,18 @@ class AutoTradeWorker:
                 )
             
             try:
-                # ВЫПОЛНЯЕМ ТРЕЙД (та же функция что manual!)
+                
                 result = trade_market(
                     user_private_key=private_key,
                     token_id=token_id,
                     side="BUY",
                     amount_usdc=retry_amount,
                     telegram_id=telegram_id,
-                    funder_address=wallet['safe_address']  # ✅ Safe + attribution
+                    funder_address=wallet['safe_address']  
                 )
                 
                 if result['status'] == 'success':
-                    # УСПЕХ!
+                    
                     print(f"✅ Order executed successfully on attempt {attempt}")
                     
                     await self.send_notification(
@@ -146,12 +142,12 @@ class AutoTradeWorker:
                     }
                 
                 else:
-                    # Ошибка - пробуем ещё раз
+                    
                     error = result.get('error', 'Unknown error')
                     print(f"❌ Attempt {attempt} failed: {error}")
                     
                     if attempt < max_retries:
-                        # Ждём перед следующей попыткой
+                        
                         await asyncio.sleep(3 * attempt)
                     
             except Exception as e:
@@ -160,7 +156,7 @@ class AutoTradeWorker:
                 if attempt < max_retries:
                     await asyncio.sleep(3 * attempt)
         
-        # ВСЕ ПОПЫТКИ ПРОВАЛИЛИСЬ
+        
         print(f"❌ All {max_retries} attempts failed")
         
         await self.send_notification(
@@ -182,7 +178,7 @@ class AutoTradeWorker:
     async def check_and_execute_orders(self):
         """Проверить все активные ордера и выполнить если триггер сработал"""
         
-        # Получаем все активные ордера
+        
         active_orders = self.db.get_active_auto_orders()
         
         if not active_orders:
@@ -196,7 +192,7 @@ class AutoTradeWorker:
                 trigger_type = order['trigger_type']
                 trigger_value = order['trigger_value']
                 
-                # Проверяем сработал ли триггер
+                
                 triggered = await self.price_monitor.check_trigger(
                     market_alias=market_alias,
                     trigger_type=trigger_type,
@@ -206,10 +202,10 @@ class AutoTradeWorker:
                 if triggered:
                     print(f"🚀 TRIGGER HIT! Order #{order['id']}")
                     
-                    # Выполняем ордер с retry
+                    
                     result = await self.execute_order_with_retry(order)
                     
-                    # Обновляем статус в БД
+                    
                     if result['status'] == 'success':
                         self.db.update_auto_order_status(order['id'], 'executed')
                         print(f"✅ Order #{order['id']} executed and marked as completed")
@@ -217,7 +213,7 @@ class AutoTradeWorker:
                         self.db.update_auto_order_status(order['id'], 'failed')
                         print(f"❌ Order #{order['id']} failed and marked as failed")
                     
-                    # Сбрасываем initial price для этого маркета
+                    
                     outcome = 'yes' if 'YES' in trigger_type else 'no'
                     self.price_monitor.reset_initial_price(market_alias, outcome)
                 
@@ -241,10 +237,10 @@ class AutoTradeWorker:
                 
                 print(f"[{timestamp}] Iteration #{iteration}")
                 
-                # Проверяем и выполняем ордера
+                
                 await self.check_and_execute_orders()
                 
-                # Ждём до следующей проверки
+                
                 await asyncio.sleep(self.check_interval)
                 
             except KeyboardInterrupt:
@@ -255,20 +251,20 @@ class AutoTradeWorker:
                 import traceback
                 traceback.print_exc()
                 
-                # Ждём немного перед продолжением
+                
                 await asyncio.sleep(self.check_interval)
 
 
 async def main():
-    """Запуск worker'а"""
-    # Получаем Telegram token
+    """worker'а"""
+    
     telegram_token = os.getenv("TELEGRAM_TOKEN")
     
     if not telegram_token:
         print("❌ TELEGRAM_TOKEN not found in environment!")
         return
     
-    # Создаём и запускаем worker
+    
     worker = AutoTradeWorker(telegram_token)
     await worker.run()
 
@@ -278,5 +274,5 @@ if __name__ == "__main__":
     print("🤖 OpiPoliX Auto-Trade Worker")
     print("="*60)
     
-    # Запускаем async event loop
+   
     asyncio.run(main())

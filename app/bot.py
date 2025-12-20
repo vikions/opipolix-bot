@@ -15,7 +15,7 @@ from telegram.ext import (
 from opinion_client import get_simple_markets, get_opinion_binary_prices
 from polymarket_client import get_simple_poly_markets, get_polymarket_binary_prices
 
-# NEW: wallet manager for creating user wallets
+
 from wallet_manager import WalletManager
 from balance_checker import check_user_balance
 from withdraw_manager import withdraw_usdc_from_safe
@@ -23,7 +23,7 @@ from market_config import get_market, get_all_markets, is_market_ready
 from clob_trading import trade_market
 from balance_checker import BalanceChecker
 
-# Auto-Trade imports
+
 from auto_trade_handlers import (
     build_auto_trade_keyboard,
     handle_auto_buy_yes_pump,
@@ -36,10 +36,10 @@ from cancel_order_handler import cancel_auto_order
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
-# Initialize wallet manager
+
 wallet_manager = WalletManager()
 
-# Help Text
+
 HELP_TEXT = (
     "OpiPoliX Bot — crypto prediction market spread tracker.\n\n"
     "Commands:\n"
@@ -57,7 +57,7 @@ HELP_TEXT = (
     "/spread base\n"
 )
 
-# Common markets
+
 COMMON_MARKETS = [
     {
         "alias": "metamask",
@@ -73,7 +73,7 @@ COMMON_MARKETS = [
     },
 ]
 
-# Button labels (English)
+
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
@@ -104,16 +104,16 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
 
 
 def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
-    """Клавиатура для меню Trading"""
+    """Build keyboard for Trading menu"""
     if safe_deployed:
-        # Safe уже задеплоен - показываем только основные кнопки
+        # Safe already deployed - show main buttons only
         rows = [
             [KeyboardButton("💰 Check Balance"), KeyboardButton("💸 Withdraw")],
             [KeyboardButton("🎯 Markets"), KeyboardButton("📋 Wallet Info")],
             [KeyboardButton("🔙 Back to Main Menu")],
         ]
     else:
-        # Safe не задеплоен - показываем кнопку деплоя
+        # Safe not deployed - show deploy button
         rows = [
             [KeyboardButton(BTN_DEPLOY_SAFE)],
             [KeyboardButton("🔙 Back to Main Menu")],
@@ -122,7 +122,7 @@ def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
 
 
 def build_markets_keyboard() -> ReplyKeyboardMarkup:
-    """Клавиатура для выбора маркета"""
+    """Build keyboard for market selection"""
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
         [KeyboardButton("🔙 Back to Trading")],
@@ -131,7 +131,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
 
 
 def build_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
-    """Клавиатура для торговли конкретным маркетом"""
+    """Build keyboard for trading a specific market"""
     rows = [
         [KeyboardButton(f"📈 Buy YES"), KeyboardButton(f"📉 Buy NO")],
         [KeyboardButton(f"📊 Sell YES"), KeyboardButton(f"📊 Sell NO")],
@@ -142,7 +142,7 @@ def build_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
 
 
 def build_sell_percentage_keyboard() -> ReplyKeyboardMarkup:
-    """Клавиатура для выбора % продажи"""
+    """Build keyboard for selecting sell percentage"""
     rows = [
         [KeyboardButton("25%"), KeyboardButton("50%")],
         [KeyboardButton("75%"), KeyboardButton("100%")],
@@ -279,23 +279,23 @@ async def spread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Главное меню Trading - создание/показ кошелька
-    С АВТОМАТИЧЕСКИМ деплоем Safe!
+    Main Trading menu - wallet creation/display
+    With AUTOMATIC Safe deployment!
     """
     telegram_id = update.message.from_user.id
     
-    # Проверяем есть ли у пользователя кошелек
+    # Check if user has a wallet
     wallet = wallet_manager.get_wallet(telegram_id)
     
     if wallet is None:
-        # ===== НОВЫЙ ПОЛЬЗОВАТЕЛЬ - СОЗДАЁМ КОШЕЛЕК =====
+        # ===== NEW USER - CREATE WALLET =====
         await update.message.reply_text(
             "🔄 Creating your wallet...\n"
             "This may take a few seconds..."
         )
         
         try:
-            # 1. Создаем EOA кошелек
+            # 1. Create EOA wallet
             wallet = wallet_manager.create_wallet_for_user(telegram_id)
             
             await update.message.reply_text(
@@ -306,11 +306,11 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 parse_mode="Markdown"
             )
             
-            # 2. АВТОМАТИЧЕСКИ деплоим Safe
+            # 2. AUTOMATICALLY deploy Safe
             result = wallet_manager.deploy_safe_and_setup(telegram_id)
             
             if result['status'] == 'success':
-                # Успех! Формируем список транзакций
+                # Success! Format transaction list
                 tx_lines = []
                 if result.get('safe_tx_hash'):
                     tx_lines.append(f"• Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
@@ -339,7 +339,7 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                     reply_markup=build_trading_keyboard(True)
                 )
             else:
-                # Ошибка деплоя - но EOA создан
+                # Deploy error - but EOA created
                 await update.message.reply_text(
                     f"⚠️ Safe deployment failed\n\n"
                     f"Error: {result.get('error', 'Unknown')}\n\n"
@@ -357,12 +357,12 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             return
     
     else:
-        # ===== СУЩЕСТВУЮЩИЙ ПОЛЬЗОВАТЕЛЬ =====
-        # ПЕРЕЗАГРУЖАЕМ wallet из БД чтобы получить актуальный safe_address
+        # ===== EXISTING USER =====
+        # RELOAD wallet from DB to get current safe_address
         wallet = wallet_manager.get_wallet(telegram_id)
         
         if wallet['safe_address']:
-            # Safe задеплоен
+            # Safe deployed
             await update.message.reply_text(
                 "💼 *Your Trading Wallet*\n\n"
                 f"🦺 *Safe Address:*\n`{wallet['safe_address']}`\n\n"
@@ -381,7 +381,7 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 reply_markup=build_trading_keyboard(True)
             )
         else:
-            # EOA есть, но Safe не задеплоен
+            # EOA exists, but Safe not deployed
             await update.message.reply_text(
                 "💼 *Your Wallet Info*\n\n"
                 f"🦺 Safe Wallet: Not deployed yet\n\n"
@@ -393,13 +393,10 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Деплой Safe wallet через Relayer (GASLESS!)
-    Вызывается кнопкой или командой
-    """
+   
     telegram_id = update.message.from_user.id
     
-    # Проверяем что у юзера есть EOA кошелек
+    
     wallet = wallet_manager.get_wallet(telegram_id)
     
     if not wallet:
@@ -410,7 +407,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     
-    # Проверяем не задеплоен ли Safe уже
+    
     if wallet['safe_address']:
         await update.message.reply_text(
             f"✅ Your Safe is already deployed!\n\n"
@@ -421,7 +418,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     
-    # Начинаем деплой
+    
     await update.message.reply_text(
         "🚀 Deploying your Safe wallet...\n\n"
         "⏳ This may take 30-60 seconds\n"
@@ -431,11 +428,11 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     
     try:
-        # Деплоим Safe + approve токены через Relayer
+        
         result = wallet_manager.deploy_safe_and_setup(telegram_id)
         
         if result['status'] == 'success':
-            # Успех! Формируем список транзакций
+            
             tx_lines = []
             if result.get('safe_tx_hash'):
                 tx_lines.append(f"• Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
@@ -457,7 +454,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=build_trading_keyboard(True)
             )
         else:
-            # Ошибка
+            
             error_msg = result.get('error', 'Unknown error')
             step = result.get('step', 'unknown')
             
@@ -479,7 +476,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Проверка баланса пользователя
+    Check user's balance
     """
     telegram_id = update.message.from_user.id
     
@@ -493,11 +490,11 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
         return
     
-    # Показываем сообщение о загрузке
+    # Show loading message
     await update.message.reply_text("🔍 Checking your balance...")
     
     try:
-        # Проверяем баланс через Web3
+        # Check balance via Web3
         balance_message = check_user_balance(
             eoa_address=wallet['eoa_address'],
             safe_address=wallet.get('safe_address')
@@ -517,7 +514,7 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    Вывод USDC из Safe
+    Withdraw USDC from Safe
     """
     telegram_id = update.message.from_user.id
     
@@ -531,7 +528,7 @@ async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
     
-    # Инструкция для вывода
+    # Withdrawal instructions
     await update.message.reply_text(
         "💸 *Withdraw USDC*\n\n"
         "To withdraw, send a message in format:\n"
@@ -559,7 +556,7 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
         return
     
-    # Проверяем аргументы
+    
     if len(context.args) < 2:
         await update.message.reply_text(
             "⚠️ Usage: /withdraw <amount> <address>\n\n"
@@ -571,17 +568,17 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     
     try:
-        # Парсим amount
+        
         amount = float(context.args[0])
         
         if amount <= 0:
             await update.message.reply_text("❌ Amount must be positive!")
             return
         
-        # Парсим адрес
+        
         recipient = context.args[1]
         
-        # Проверяем адрес
+        
         if not recipient.startswith('0x') or len(recipient) != 42:
             await update.message.reply_text("❌ Invalid address format!")
             return
@@ -593,10 +590,10 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             parse_mode="Markdown"
         )
         
-        # Получаем приватный ключ через WalletManager
+        
         private_key = wallet_manager.get_private_key(telegram_id)
         
-        # Выполняем вывод через Relayer (gasless!)
+        
         result = withdraw_usdc_from_safe(
             user_private_key=private_key,
             recipient_address=recipient,
@@ -645,7 +642,7 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
     
-    # Показываем доступные маркеты
+   
     await update.message.reply_text(
         "🎯 *Available Markets*\n\n"
         "🦊 *MetaMask Token 2025*\n"
@@ -673,7 +670,7 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         )
         return
     
-    # Проверяем что маркет готов
+    
     if not is_market_ready(market_alias):
         await update.message.reply_text(
             f"⚠️ {market_alias.title()} market is not ready yet!\n"
@@ -684,7 +681,7 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     market = get_market(market_alias)
     
-    # Показываем меню торговли
+    
     await update.message.reply_text(
         f"{market['emoji']} *{market['title']}*\n\n"
         f"📊 Choose your action:\n\n"
@@ -697,7 +694,7 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         reply_markup=build_trade_keyboard(market_alias)
     )
     
-    # Сохраняем выбранный маркет в context
+    
     context.user_data['current_market'] = market_alias
 
 
@@ -719,7 +716,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     market = get_market(market_alias)
     token_id = market['tokens'][outcome]
     
-    # Получаем wallet
+    
     wallet = wallet_manager.get_wallet(telegram_id)
     
     if not wallet or not wallet['safe_address']:
@@ -729,7 +726,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
         )
         return
     
-    # Показываем сообщение о выполнении
+    
     action_emoji = "📈" if action == "buy" else "📊"
     action_text = "Buying" if action == "buy" else "Selling"
     
@@ -741,10 +738,10 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     )
     
     try:
-        # Получаем приватный ключ через WalletManager
+        
         private_key = wallet_manager.get_private_key(telegram_id)
         
-        # Выполняем трейд через CLOB
+        
         side = "BUY" if action == "buy" else "SELL"
         
         result = trade_market(
@@ -753,7 +750,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
             side=side,
             amount_usdc=amount,
             telegram_id=telegram_id,
-            funder_address=wallet["safe_address"],  # ✅ SAFE как funder
+            funder_address=wallet["safe_address"],  
         )
 
         
@@ -785,7 +782,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
         )
     
     finally:
-        # Очищаем pending trade
+        
         context.user_data.pop('pending_trade', None)
 
 
@@ -817,25 +814,25 @@ async def auto_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, ma
         reply_markup=build_auto_trade_keyboard(market_alias)
     )
     
-    # Сохраняем маркет в context
+    
     context.user_data['auto_trade_market'] = market_alias
 
 
-# ===== ОБРАБОТЧИК КНОПОК =====
+
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик кнопок"""
     text = update.message.text.strip()
     
-    # Пропускаем команды (handlers обработают их)
+    
     if text.startswith('/'):
         return
     
-    # НОВОЕ: Проверяем pending_auto_trade (юзер настраивает auto-order)
+    
     if await handle_pending_auto_trade_input(update, context, text):
         return
     
-    # Проверяем есть ли pending trade (юзер вводит сумму)
+    
     if context.user_data.get('pending_trade'):
         try:
             amount = float(text)
@@ -844,14 +841,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 await update.message.reply_text("❌ Minimum amount is $1 USDC")
                 return
             
-            # Выполняем трейд
+            
             return await execute_trade(update, context, amount)
             
         except ValueError:
-            # Не число - продолжаем обработку кнопок
+            
             pass
     
-    # Основные кнопки
+    
     if text == BTN_SPREAD_METAMASK:
         return await _spread_for_alias(update, context, "metamask")
     
@@ -870,7 +867,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if text == BTN_TRADING:
         return await trading_menu(update, context)
     
-    # Кнопки Trading меню
+    
     if text == BTN_DEPLOY_SAFE:
         return await deploy_safe_wallet(update, context)
     
@@ -919,14 +916,14 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
     
-    # Кнопки Markets меню
+    
     if text == "🦊 MetaMask Token":
         return await market_trade_menu(update, context, "metamask")
     
     if text == "🔵 Base Token":
         return await market_trade_menu(update, context, "base")
     
-    # Навигация
+    
     if text == "🔙 Back to Trading":
         return await trading_menu(update, context)
     
@@ -934,7 +931,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return await markets_menu(update, context)
     
     if text == "🔙 Back to Market":
-        # Возврат к меню маркета из Auto-Trade
+        
         current_market = context.user_data.get('auto_trade_market') or context.user_data.get('current_market')
         
         if not current_market:
@@ -942,9 +939,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         return await market_trade_menu(update, context, current_market)
     
-    # Кнопки торговли (Buy/Sell)
+    
     if text in ["📈 Buy YES", "📉 Buy NO", "📊 Sell YES", "📊 Sell NO"]:
-        # Получаем текущий маркет
+        
         current_market = context.user_data.get('current_market')
         
         if not current_market:
@@ -954,7 +951,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
             return
         
-        # Определяем action и outcome
+        
         if "Buy YES" in text:
             action = "buy"
             outcome = "yes"
@@ -970,9 +967,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         market = get_market(current_market)
         
-        # Для SELL - показываем % кнопки
+        
         if action == "sell":
-            # Сохраняем инфо о продаже
+            
             context.user_data['pending_sell'] = {
                 'market': current_market,
                 'outcome': outcome
@@ -986,7 +983,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 reply_markup=build_sell_percentage_keyboard()
             )
         else:
-            # Для BUY - запрашиваем сумму как раньше
+            
             context.user_data['pending_trade'] = {
                 'market': current_market,
                 'action': action,
@@ -1003,7 +1000,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         return
     
-    # Кнопка Auto-Trade
+    
     if text == "🤖 Auto-Trade":
         current_market = context.user_data.get('current_market')
         
@@ -1016,7 +1013,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         return await auto_trade_menu(update, context, current_market)
     
-    # Обработка % кнопок для SELL
+    
     if text in ["25%", "50%", "75%", "100%"]:
         pending_sell = context.user_data.get('pending_sell')
         
@@ -1050,17 +1047,17 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         
         try:
-            # Получаем приватный ключ
+            
             private_key = wallet_manager.get_private_key(telegram_id)
             
-            # Получаем баланс токенов через Web3 (KAK В balance_checker!)
+            
             balance_checker = BalanceChecker()
             token_balance_raw = balance_checker.get_position_balance(
                 wallet['safe_address'],
                 token_id
             )
             
-            # CTF токены имеют 6 decimals (как USDC)
+            
             token_balance = token_balance_raw / 1e6
             
             print(f"📊 Token balance: {token_balance_raw} raw = {token_balance} tokens")
@@ -1074,7 +1071,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 context.user_data.pop('pending_sell', None)
                 return
             
-            # Вычисляем сколько продавать
+           
             amount_to_sell = (token_balance * percentage) / 100
             
             await update.message.reply_text(
@@ -1084,21 +1081,19 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 f"⏳ Please wait..."
             )
             
-            # Выполняем продажу
-            # Для SELL указываем amount в USDC (примерная стоимость)
-            # Или можно указать amount_to_sell как количество токенов
+           
             result = trade_market(
                 user_private_key=private_key,
                 token_id=token_id,
                 side="SELL",
-                amount_usdc=amount_to_sell,  # Продаём на эту сумму
+                amount_usdc=amount_to_sell,  
                 telegram_id=telegram_id,
                 funder_address=wallet['safe_address']
             )
             
             if result['status'] == 'success':
                 order_id = result.get('order_id', 'N/A')
-                # Если order_id - это dict, берём только ID
+                
                 if isinstance(order_id, dict):
                     order_id = order_id.get('orderID', str(order_id)[:16])
                 
@@ -1129,13 +1124,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             )
         
         finally:
-            # Очищаем pending sell
+            
             context.user_data.pop('pending_sell', None)
         
         return
     
-    # Auto-Trade кнопки
-    # Auto-Trade кнопки - НОВЫЕ ОБРАБОТЧИКИ!
+   
     if text == "📈 Buy YES on Pump":
         return await handle_auto_buy_yes_pump(update, context)
     
@@ -1166,7 +1160,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
     
-    # Неизвестная команда
+   
     await update.message.reply_text(
         "Unknown command. Use /help or keyboard buttons.",
         reply_markup=build_main_keyboard()
@@ -1179,7 +1173,7 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
     
-    # Команды
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("about", about))
@@ -1188,14 +1182,14 @@ def main():
     app.add_handler(CommandHandler("p_markets", p_markets))
     app.add_handler(CommandHandler("spread", spread))
     
-    # Trading команды
+    
     app.add_handler(CommandHandler("balance", check_balance))
     app.add_handler(CommandHandler("wallet", trading_menu))
     app.add_handler(CommandHandler("deploy_safe", deploy_safe_wallet))
     app.add_handler(CommandHandler("withdraw", withdraw_command))
     app.add_handler(CommandHandler("cancel", cancel_auto_order))
     
-    # Обработчик кнопок
+    
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
     
     app.run_polling()

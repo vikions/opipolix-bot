@@ -1,9 +1,5 @@
-"""
-Market Configuration для OpiPoliX бота
-Конфигурация торговых маркетов
-"""
 
-# Маркеты для торговли
+
 MARKETS = {
     "metamask": {
         "title": "MetaMask Token 2025",
@@ -41,22 +37,22 @@ MARKETS = {
 
 
 def get_market(alias: str):
-    """Получить конфиг маркета по alias"""
+    
     return MARKETS.get(alias.lower())
 
 
 def get_all_markets():
-    """Получить все доступные маркеты"""
+    
     return MARKETS
 
 
 def is_market_ready(alias: str) -> bool:
-    """Проверить готов ли маркет к торговле"""
+    
     market = get_market(alias)
     if not market:
         return False
     
-    # Проверяем что все данные заполнены
+   
     if market['condition_id'] == 'TBD':
         return False
     if market['tokens']['yes'] == 'TBD':

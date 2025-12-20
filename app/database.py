@@ -1,7 +1,4 @@
-"""
-Модуль для работы с базой данных
-PostgreSQL для продакшн (Railway) с поддержкой SQLite для локальной разработки
-"""
+
 import os
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -9,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Определяем тип БД
+
 DATABASE_URL = os.getenv("DATABASE_URL")  # PostgreSQL URL from Railway
 USE_POSTGRES = DATABASE_URL is not None
 
@@ -24,7 +21,7 @@ else:
 
 
 class Database:
-    """Класс для работы с БД (PostgreSQL или SQLite)"""
+    
     
     def __init__(self):
         self.use_postgres = USE_POSTGRES
@@ -33,17 +30,17 @@ class Database:
     def get_connection(self):
         """Создает подключение к БД"""
         if self.use_postgres:
-            # PostgreSQL connection
+            
             conn = psycopg2.connect(DATABASE_URL)
             return conn
         else:
-            # SQLite connection
+            
             conn = sqlite3.connect(DB_FILE)
             conn.row_factory = sqlite3.Row
             return conn
     
     def init_database(self):
-        """Создает таблицы если их нет"""
+        
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -141,7 +138,7 @@ class Database:
     # ===== WALLET METHODS =====
     
     def get_wallet(self, telegram_id: int) -> Optional[Dict[str, Any]]:
-        """Получить кошелек пользователя"""
+        
         conn = self.get_connection()
         
         if self.use_postgres:
@@ -166,7 +163,7 @@ class Database:
     
     def create_wallet(self, telegram_id: int, eoa_address: str, 
                      eoa_private_key: str, safe_address: str = None) -> bool:
-        """Создать новый кошелек"""
+        
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -246,7 +243,7 @@ class Database:
         return order_id
     
     def get_active_auto_orders(self):
-        """Получить все активные авто-ордера"""
+        
         conn = self.get_connection()
         
         if self.use_postgres:
@@ -266,7 +263,7 @@ class Database:
         return [dict(row) for row in rows]
     
     def get_user_auto_orders(self, telegram_id: int):
-        """Получить авто-ордера пользователя"""
+        
         conn = self.get_connection()
         
         if self.use_postgres:
@@ -290,7 +287,7 @@ class Database:
         return [dict(row) for row in rows]
     
     def update_auto_order_status(self, order_id: int, status: str):
-        """Обновить статус авто-ордера"""
+        
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -315,7 +312,7 @@ class Database:
     def add_transaction(self, telegram_id: int, market_alias: str,
                        side: str, amount: float, price: float, 
                        tx_hash: str = None) -> int:
-        """Добавить транзакцию в историю"""
+        
         conn = self.get_connection()
         cursor = conn.cursor()
         
@@ -341,7 +338,7 @@ class Database:
         return tx_id
     
     def get_user_transactions(self, telegram_id: int, limit: int = 10):
-        """Получить историю транзакций пользователя"""
+        
         conn = self.get_connection()
         
         if self.use_postgres:

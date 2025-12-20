@@ -1,7 +1,3 @@
-"""
-Auto-Trade handlers для бота
-Обработка создания и управления авто-ордерами
-"""
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from auto_trade_manager import AutoTradeManager
@@ -13,7 +9,7 @@ auto_trade_manager = AutoTradeManager()
 
 
 def build_auto_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
-    """Клавиатура для Auto-Trade меню"""
+    """Build Auto-Trade menu keyboard"""
     rows = [
         [KeyboardButton("📈 Buy YES on Pump"), KeyboardButton("🎭 Buy NO on Pump")],
         [KeyboardButton("📉 Buy NO on Dump")],
@@ -24,14 +20,14 @@ def build_auto_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
 
 
 async def handle_auto_buy_yes_pump(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка кнопки 'Buy YES on Pump'"""
+    """Handle 'Buy YES on Pump' button"""
     current_market = context.user_data.get('auto_trade_market') or context.user_data.get('current_market')
     
     if not current_market:
         await update.message.reply_text("❌ Please select a market first!")
         return
     
-    # Сохраняем что юзер настраивает auto-buy YES
+    
     context.user_data['pending_auto_trade'] = {
         'market': current_market,
         'type': 'buy_yes_pump',
@@ -56,7 +52,7 @@ async def handle_auto_buy_yes_pump(update: Update, context: ContextTypes.DEFAULT
 
 
 async def handle_auto_buy_no_pump(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка кнопки 'Buy NO on Pump' (fake news)"""
+    """Handle 'Buy NO on Pump' button (fake news strategy)"""
     current_market = context.user_data.get('auto_trade_market') or context.user_data.get('current_market')
     
     if not current_market:
@@ -88,7 +84,7 @@ async def handle_auto_buy_no_pump(update: Update, context: ContextTypes.DEFAULT_
 
 
 async def handle_auto_buy_no_dump(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка кнопки 'Buy NO on Dump'"""
+    """Handle 'Buy NO on Dump' button"""
     current_market = context.user_data.get('auto_trade_market') or context.user_data.get('current_market')
     
     if not current_market:
@@ -121,10 +117,10 @@ async def handle_auto_buy_no_dump(update: Update, context: ContextTypes.DEFAULT_
 
 async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     """
-    Обработка ввода данных для auto-trade
+    Handle user input for auto-trade configuration
     
     Returns:
-        bool: True если обработали, False если нет
+        bool: True if handled, False otherwise
     """
     pending = context.user_data.get('pending_auto_trade')
     
@@ -135,7 +131,6 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
     
     try:
         if step == 'trigger_percent':
-            # Юзер ввёл процент триггера
             trigger_percent = float(text)
             
             if trigger_percent <= 0 or trigger_percent > 500:
@@ -145,7 +140,7 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
                 )
                 return True
             
-            # Сохраняем процент и переходим к вводу суммы
+           
             pending['trigger_percent'] = trigger_percent
             pending['step'] = 'amount'
             
@@ -163,14 +158,14 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
             return True
             
         elif step == 'amount':
-            # Юзер ввёл сумму
+          
             amount = float(text)
             
             if amount < 1:
                 await update.message.reply_text("❌ Minimum amount is $1 USDC")
                 return True
             
-            # Создаём ордер!
+           
             telegram_id = update.message.from_user.id
             
             order_id = auto_trade_manager.create_order(
@@ -181,7 +176,7 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
                 amount_usdc=amount
             )
             
-            # Форматируем результат
+           
             market = get_market(pending['market'])
             order_type_name = {
                 'buy_yes_pump': '📈 Buy YES on Pump',
@@ -203,7 +198,7 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
                 reply_markup=build_auto_trade_keyboard(pending['market'])
             )
             
-            # Очищаем pending
+           
             context.user_data.pop('pending_auto_trade', None)
             
             return True
@@ -216,7 +211,7 @@ async def handle_pending_auto_trade_input(update: Update, context: ContextTypes.
 
 
 async def handle_my_active_orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать активные ордера пользователя"""
+    """Display user's active orders"""
     telegram_id = update.message.from_user.id
     
     orders = auto_trade_manager.get_user_orders(telegram_id)
@@ -233,13 +228,13 @@ async def handle_my_active_orders(update: Update, context: ContextTypes.DEFAULT_
         )
         return
     
-    # Форматируем список ордеров
+ 
     lines = ["📊 *My Active Auto-Orders*\n"]
     
     for order in orders:
         info = auto_trade_manager.format_order_info(order)
         lines.append(info)
-        lines.append("")  # Пустая строка между ордерами
+        lines.append("")  
     
     lines.append(f"Total: {len(orders)} active order(s)")
     lines.append("\n🔴 To cancel: Send `/cancel <order_id>`")

@@ -1,7 +1,4 @@
-"""
-CLOB Trading для OpiPoliX бота
-Размещение ордеров через Polymarket CLOB API
-"""
+
 import os
 from typing import Dict, Literal, Optional
 from py_clob_client.client import ClobClient
@@ -11,19 +8,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuration
+
 CLOB_URL = "https://clob.polymarket.com"
-CHAIN_ID = 137  # Polygon Mainnet
+CHAIN_ID = 137  
 BUILDER_SIGNING_URL = os.environ.get("BUILDER_SIGNING_URL")
 
-# Local builder credentials (fallback)
+
 BUILDER_API_KEY = os.environ.get("BUILDER_API_KEY")
 BUILDER_SECRET = os.environ.get("BUILDER_SECRET")
 BUILDER_PASS_PHRASE = os.environ.get("BUILDER_PASS_PHRASE")
 
 
 class UserClobClient:
-    """CLOB client для одного пользователя (как в твоём JS коде)"""
+    
 
     def __init__(
         self,
@@ -33,15 +30,15 @@ class UserClobClient:
     ):
         """
         Args:
-            user_private_key: Расшифрованный приватный ключ пользователя (EOA signer)
-            telegram_id: ID пользователя для логирования
-            funder_address: Адрес funding wallet на Polymarket (обычно Safe/proxy), где лежат USDC и позиции
+            user_private_key: 
+            telegram_id: 
+            funder_address: 
         """
         self.telegram_id = telegram_id
         self.private_key = user_private_key
         self.funder_address = funder_address
 
-        # Builder config для CLOB
+        
         if BUILDER_API_KEY and BUILDER_SECRET and BUILDER_PASS_PHRASE:
             print("🔑 Using LOCAL builder credentials for CLOB")
             from py_builder_signing_sdk.config import BuilderApiKeyCreds
@@ -60,12 +57,10 @@ class UserClobClient:
         else:
             raise ValueError("Builder credentials not configured!")
 
-        # signature_type:
-        # 0 = EOA
-        # 2 = POLY_GNOSIS_SAFE (Safe/proxy funding wallet)
+       
         signature_type = 2 if self.funder_address else 0
 
-        # Создаём основной client (с funder/signature_type если задан funder)
+      
         self.client = ClobClient(
             host=CLOB_URL,
             key=self.private_key,
@@ -137,21 +132,20 @@ class UserClobClient:
 
     def get_token_balance(self, token_id: str) -> float:
         """
-        Получить баланс конкретного токена
+        
         
         Returns:
-            float: количество токенов (в raw units)
+            float: 
         """
         try:
-            # Получаем все позиции пользователя
-            # Используем get_positions() вместо get_balance_allowance()
+           
             positions_response = self.client.get_positions()
             
             if not positions_response:
                 print(f"⚠️ No positions found")
                 return 0.0
             
-            # positions_response может быть списком или объектом с полем data/positions
+            
             positions = []
             if isinstance(positions_response, list):
                 positions = positions_response
@@ -160,9 +154,9 @@ class UserClobClient:
             elif hasattr(positions_response, 'positions'):
                 positions = positions_response.positions
             
-            # Ищем наш token_id в позициях
+            
             for position in positions:
-                # Проверяем разные варианты полей
+                
                 pos_token_id = None
                 if hasattr(position, 'asset_id'):
                     pos_token_id = position.asset_id
@@ -172,7 +166,7 @@ class UserClobClient:
                     pos_token_id = position.get('asset_id') or position.get('token_id')
                 
                 if pos_token_id == token_id:
-                    # Получаем balance
+                    
                     balance = 0.0
                     if hasattr(position, 'balance'):
                         balance = float(position.balance)
@@ -203,9 +197,9 @@ def trade_market(
     funder_address: Optional[str] = None,  # <-- добавили
 ) -> Dict:
     """
-    Helper function для размещения market order
+    Helper function 
 
-    funder_address: передай сюда safe_address пользователя (funding wallet), чтобы не было not enough allowance
+    funder_address: 
     """
     client = UserClobClient(user_private_key, telegram_id, funder_address=funder_address)
     return client.create_market_order(token_id, side, amount_usdc)
@@ -218,10 +212,10 @@ def get_token_balance(
     telegram_id: int = None,
 ) -> float:
     """
-    Получить баланс токена
+    
     
     Returns:
-        float: количество токенов
+        float: 
     """
     client = UserClobClient(user_private_key, telegram_id, funder_address=funder_address)
     return client.get_token_balance(token_id)

@@ -1,6 +1,4 @@
-"""
-Cancel auto-order command handler
-"""
+
 from telegram import Update
 from telegram.ext import ContextTypes
 from auto_trade_manager import AutoTradeManager
@@ -9,7 +7,7 @@ auto_trade_manager = AutoTradeManager()
 
 
 async def cancel_auto_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отменить авто-ордер по ID"""
+    
     telegram_id = update.message.from_user.id
     
     if not context.args:
@@ -27,7 +25,7 @@ async def cancel_auto_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Invalid order ID! Must be a number")
         return
     
-    # Проверяем что ордер принадлежит пользователю
+    
     orders = auto_trade_manager.get_user_orders(telegram_id)
     order = next((o for o in orders if o['id'] == order_id), None)
     
@@ -39,7 +37,7 @@ async def cancel_auto_order(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # Отменяем ордер
+    
     auto_trade_manager.cancel_order(order_id)
     
     await update.message.reply_text(

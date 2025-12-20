@@ -1,5 +1,5 @@
 """
-Запуск бота и worker одновременно
+Start bot and worker simultaneously
 """
 import subprocess
 import sys
@@ -7,10 +7,10 @@ import sys
 def main():
     print("🚀 Starting OpiPoliX Bot + Auto-Trade Worker...", flush=True)
     
-    # Запускаем оба процесса
+    # Start both processes
     processes = []
     
-    # Передаём все переменные окружения
+    # Pass all environment variables
     import os
     env = os.environ.copy()
     
@@ -23,7 +23,7 @@ def main():
         text=True,
         bufsize=1,  # Line buffered
         universal_newlines=True,
-        env=env  # ← ПЕРЕДАЁМ ENV!
+        env=env
     )
     processes.append(("bot", bot_process))
     
@@ -36,27 +36,27 @@ def main():
         text=True,
         bufsize=1,  # Line buffered
         universal_newlines=True,
-        env=env  # ← ПЕРЕДАЁМ ENV!
+        env=env
     )
     processes.append(("worker", worker_process))
     
     print("✅ Both processes started!", flush=True)
     print("📊 Monitoring outputs...\n", flush=True)
     
-    # Читаем вывод обоих процессов
+    # Read output from both processes
     import select
     
     while True:
         for name, process in processes:
-            # Проверяем завершился ли процесс
+            # Check if process exited
             if process.poll() is not None:
                 print(f"❌ {name} stopped! Exit code: {process.returncode}", flush=True)
-                # Убиваем все процессы
+                # Kill all processes
                 for _, p in processes:
                     p.kill()
                 sys.exit(1)
             
-            # Читаем stdout
+            # Read stdout
             try:
                 line = process.stdout.readline()
                 if line:
@@ -64,11 +64,11 @@ def main():
             except:
                 pass
             
-            # Читаем stderr (только критичные ошибки)
+            # Read stderr (critical errors only)
             try:
                 line = process.stderr.readline()
                 if line:
-                    # Игнорируем traceback строки, показываем только итоговую ошибку
+                    # Ignore traceback lines, show only final error
                     if not any(x in line for x in ['File "', 'Traceback', '^^^^', '^^^', 'yield']):
                         print(f"[{name}] ERROR: {line.strip()}", file=sys.stderr, flush=True)
             except:

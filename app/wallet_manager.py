@@ -1,7 +1,4 @@
-"""
-Модуль для управления кошельками пользователей
-Создание EOA, деплой Safe через Relayer
-"""
+
 import os
 from eth_account import Account
 from dotenv import load_dotenv
@@ -9,33 +6,24 @@ from database import Database
 from encryption import encrypt_private_key, decrypt_private_key
 from relayer_client import UserRelayerClient, setup_user_for_trading
 
-# Загружаем переменные окружения
+
 load_dotenv()
 
-# Включаем генерацию случайных ключей
+
 Account.enable_unaudited_hdwallet_features()
 
 
 class WalletManager:
-    """Менеджер кошельков с интеграцией Relayer"""
+    
     
     def __init__(self):
         self.db = Database()
     
     def create_wallet_for_user(self, telegram_id: int) -> dict:
-        """
-        Создает новый кошелек для пользователя
-        
-        Returns:
-            dict: {
-                'telegram_id': int,
-                'eoa_address': str,
-                'safe_address': str (будет None до деплоя)
-            }
-        """
+       
         print(f"🔑 Creating wallet for user {telegram_id}...")
         
-        # Проверяем, есть ли уже кошелек
+        
         existing_wallet = self.db.get_wallet(telegram_id)
         if existing_wallet:
             print(f"⚠️  Wallet already exists for user {telegram_id}")
@@ -45,18 +33,18 @@ class WalletManager:
                 'safe_address': existing_wallet['safe_address']
             }
         
-        # 1. Генерируем новый EOA кошелек
+        
         account = Account.create()
         eoa_address = account.address
         eoa_private_key = account.key.hex()  # 0x...
         
         print(f"✅ Generated EOA: {eoa_address}")
         
-        # 2. Шифруем приватный ключ
+        
         encrypted_key = encrypt_private_key(eoa_private_key)
         print(f"✅ Private key encrypted")
         
-        # 3. Сохраняем в БД (Safe адрес пока None)
+        
         success = self.db.create_wallet(
             telegram_id=telegram_id,
             eoa_address=eoa_address,
@@ -95,7 +83,7 @@ class WalletManager:
         if not wallet:
             raise ValueError(f"Wallet not found for user {telegram_id}")
         
-        # Расшифровываем
+        
         private_key = decrypt_private_key(wallet['eoa_private_key'])
         return private_key
     
@@ -112,14 +100,14 @@ class WalletManager:
                 'status': 'success' | 'failed'
             }
         """
-        # 1. Получаем приватный ключ
+        
         private_key = self.get_private_key(telegram_id)
         
-        # 2. Деплоим Safe и approve через Relayer
+        
         print(f"\n🚀 Deploying Safe for user {telegram_id} via Relayer...")
         result = setup_user_for_trading(private_key, telegram_id)
         
-        # 3. Если успешно - сохраняем Safe адрес в БД
+        
         if result['status'] == 'success':
             safe_address = result['safe_address']
             self.db.update_safe_address(telegram_id, safe_address)
@@ -128,22 +116,22 @@ class WalletManager:
         return result
     
     def is_safe_deployed(self, telegram_id: int) -> bool:
-        """Проверить задеплоен ли Safe"""
+        
         wallet = self.db.get_wallet(telegram_id)
         return wallet and wallet['safe_address'] is not None
 
 
-# Тестовые функции
+
 def test_wallet_creation():
-    """Тест создания кошелька"""
+    
     print("🧪 Testing wallet creation...\n")
     
     manager = WalletManager()
     
-    # Тестовый пользователь
+    
     test_telegram_id = 123456789
     
-    # Создаем кошелек
+    
     wallet = manager.create_wallet_for_user(test_telegram_id)
     
     print("\n📊 Created wallet:")
@@ -151,12 +139,12 @@ def test_wallet_creation():
     print(f"   EOA Address: {wallet['eoa_address']}")
     print(f"   Safe Address: {wallet['safe_address'] or 'Not deployed yet'}")
     
-    # Проверяем что можем получить приватный ключ
+    
     try:
         private_key = manager.get_private_key(test_telegram_id)
         print(f"\n✅ Can decrypt private key: {private_key[:10]}...")
         
-        # Проверяем что ключ валидный
+        
         from eth_account import Account
         account = Account.from_key(private_key)
         
@@ -178,7 +166,7 @@ def test_safe_deployment():
     manager = WalletManager()
     test_telegram_id = 123456789
     
-    # Проверяем что кошелек создан
+    
     wallet = manager.get_wallet(test_telegram_id)
     if not wallet:
         print("❌ Create wallet first with test_wallet_creation()")
@@ -216,8 +204,8 @@ if __name__ == "__main__":
     import sys
     
     if len(sys.argv) > 1 and sys.argv[1] == "deploy":
-        # python wallet_manager.py deploy
+        
         test_safe_deployment()
     else:
-        # python wallet_manager.py
+        
         test_wallet_creation()

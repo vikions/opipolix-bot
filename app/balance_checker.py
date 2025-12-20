@@ -23,19 +23,19 @@ MARKET_TOKENS = {
         "no": "102949690272049881918816161009598998660276278148863115139226223419430092123884"
     },
     "base": {
-        "yes": "TBD",  # TODO: добавить когда будет
+        "yes": "TBD",  
         "no": "TBD"
     }
 }
 
 
 class BalanceChecker:
-    """Проверка балансов для пользователя"""
+    
     
     def __init__(self):
         self.w3 = Web3(Web3.HTTPProvider(POLYGON_RPC))
         
-        # USDC contract ABI (только balanceOf)
+        
         self.usdc_abi = [{
             "constant": True,
             "inputs": [{"name": "_owner", "type": "address"}],
@@ -44,7 +44,7 @@ class BalanceChecker:
             "type": "function"
         }]
         
-        # CTF contract ABI (только balanceOf для ERC1155)
+        
         self.ctf_abi = [{
             "constant": True,
             "inputs": [
@@ -67,19 +67,11 @@ class BalanceChecker:
         )
     
     def get_usdc_balance(self, address: str) -> float:
-        """
-        Получить баланс USDC
-        
-        Args:
-            address: Адрес кошелька (EOA или Safe)
-        
-        Returns:
-            float: Баланс в USDC (с учётом decimals=6)
-        """
+       
         try:
             checksum_address = Web3.to_checksum_address(address)
             balance_wei = self.usdc_contract.functions.balanceOf(checksum_address).call()
-            # USDC has 6 decimals
+            
             balance_usdc = balance_wei / 1e6
             return balance_usdc
         except Exception as e:
@@ -87,16 +79,7 @@ class BalanceChecker:
             return 0.0
     
     def get_position_balance(self, address: str, token_id: str) -> float:
-        """
-        Получить баланс позиции (YES или NO токенов)
-        
-        Args:
-            address: Адрес кошелька (обычно Safe)
-            token_id: ID токена (YES или NO)
-        
-        Returns:
-            float: Количество токенов
-        """
+       
         try:
             checksum_address = Web3.to_checksum_address(address)
             balance = self.ctf_contract.functions.balanceOf(
@@ -109,24 +92,7 @@ class BalanceChecker:
             return 0.0
     
     def get_full_balance(self, eoa_address: str, safe_address: str = None) -> Dict:
-        """
-        Получить полный баланс пользователя
         
-        Args:
-            eoa_address: EOA адрес
-            safe_address: Safe адрес (опционально)
-        
-        Returns:
-            dict: {
-                'eoa_usdc': float,
-                'safe_usdc': float,
-                'total_usdc': float,
-                'positions': {
-                    'metamask': {'yes': float, 'no': float},
-                    'base': {'yes': float, 'no': float}
-                }
-            }
-        """
         print(f"🔍 Checking balance for EOA: {eoa_address}")
         
         # USDC balances
@@ -139,7 +105,7 @@ class BalanceChecker:
         
         total_usdc = eoa_usdc + safe_usdc
         
-        # Positions (только на Safe, если есть)
+        # Positions 
         positions = {
             'metamask': {'yes': 0.0, 'no': 0.0},
             'base': {'yes': 0.0, 'no': 0.0}
@@ -157,7 +123,7 @@ class BalanceChecker:
                     MARKET_TOKENS['metamask']['no']
                 )
             
-            # Base positions (когда добавим token IDs)
+            # Base positions 
             if MARKET_TOKENS['base']['yes'] != 'TBD':
                 positions['base']['yes'] = self.get_position_balance(
                     safe_address,
@@ -177,18 +143,10 @@ class BalanceChecker:
 
 
 def format_balance_message(balance: Dict) -> str:
-    """
-    Форматировать баланс для отображения в Telegram
     
-    Args:
-        balance: Dict из get_full_balance()
-    
-    Returns:
-        str: Форматированное сообщение
-    """
     lines = ["💰 *Your Balance*\n"]
     
-    # USDC balance (только Safe, EOA скрыт)
+    # USDC balance 
     lines.append("*USDC:*")
     lines.append(f"  ${balance['safe_usdc']:.2f}\n")
     
@@ -226,18 +184,9 @@ def format_balance_message(balance: Dict) -> str:
     return "\n".join(lines)
 
 
-# Helper function для использования в боте
+# Helper function
 def check_user_balance(eoa_address: str, safe_address: str = None) -> str:
-    """
-    Проверить баланс пользователя и вернуть форматированное сообщение
-    
-    Args:
-        eoa_address: EOA адрес пользователя
-        safe_address: Safe адрес (опционально)
-    
-    Returns:
-        str: Форматированное сообщение для Telegram
-    """
+  
     checker = BalanceChecker()
     balance = checker.get_full_balance(eoa_address, safe_address)
     return format_balance_message(balance)

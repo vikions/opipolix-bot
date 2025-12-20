@@ -1,8 +1,8 @@
-# Environment variables (СЕКРЕТЫ!)
+
 .env
 .env.local
 
-# Database (локальная БД с кошельками!)
+
 *.db
 opipolix.db
 
@@ -33,7 +33,7 @@ Thumbs.db
 *.tmp
 temp/
 
-# Node modules (если есть JS скрипты)
+
 node_modules/
 package-lock.json
 
