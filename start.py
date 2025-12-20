@@ -64,11 +64,13 @@ def main():
             except:
                 pass
             
-            # Читаем stderr
+            # Читаем stderr (только критичные ошибки)
             try:
                 line = process.stderr.readline()
                 if line:
-                    print(f"[{name}] ERROR: {line.strip()}", file=sys.stderr)
+                    # Игнорируем traceback строки, показываем только итоговую ошибку
+                    if not any(x in line for x in ['File "', 'Traceback', '^^^^', '^^^', 'yield']):
+                        print(f"[{name}] ERROR: {line.strip()}", file=sys.stderr, flush=True)
             except:
                 pass
 
