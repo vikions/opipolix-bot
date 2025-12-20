@@ -5,33 +5,37 @@ import subprocess
 import sys
 
 def main():
-    print("🚀 Starting OpiPoliX Bot + Auto-Trade Worker...")
+    print("🚀 Starting OpiPoliX Bot + Auto-Trade Worker...", flush=True)
     
     # Запускаем оба процесса
     processes = []
     
     # Bot
-    print("▶️ Starting bot...")
+    print("▶️ Starting bot...", flush=True)
     bot_process = subprocess.Popen(
         [sys.executable, "app/bot.py"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        bufsize=1,  # Line buffered
+        universal_newlines=True
     )
     processes.append(("bot", bot_process))
     
     # Worker
-    print("▶️ Starting worker...")
+    print("▶️ Starting worker...", flush=True)
     worker_process = subprocess.Popen(
         [sys.executable, "app/auto_trade_worker.py"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        bufsize=1,  # Line buffered
+        universal_newlines=True
     )
     processes.append(("worker", worker_process))
     
-    print("✅ Both processes started!")
-    print("📊 Monitoring outputs...\n")
+    print("✅ Both processes started!", flush=True)
+    print("📊 Monitoring outputs...\n", flush=True)
     
     # Читаем вывод обоих процессов
     import select
@@ -40,7 +44,7 @@ def main():
         for name, process in processes:
             # Проверяем завершился ли процесс
             if process.poll() is not None:
-                print(f"❌ {name} stopped! Exit code: {process.returncode}")
+                print(f"❌ {name} stopped! Exit code: {process.returncode}", flush=True)
                 # Убиваем все процессы
                 for _, p in processes:
                     p.kill()
@@ -50,7 +54,7 @@ def main():
             try:
                 line = process.stdout.readline()
                 if line:
-                    print(f"[{name}] {line.strip()}")
+                    print(f"[{name}] {line.strip()}", flush=True)
             except:
                 pass
             
