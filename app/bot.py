@@ -645,8 +645,8 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
    
     await update.message.reply_text(
         "🎯 *Available Markets*\n\n"
-        "🦊 *MetaMask Token 2025*\n"
-        "Will MetaMask launch a token in 2025?\n\n"
+        "🦊 *MetaMask Token by June 30*\n"
+        "Will MetaMask launch a token by June 30?\n\n"
         "🔵 *Base Token 2025*\n"
         "Will Base launch a token in 2025?\n\n"
         "Select a market to trade:",
