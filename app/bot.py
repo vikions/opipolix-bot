@@ -761,7 +761,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
                 f"💰 Amount: ${result['amount']} USDC\n\n"
                 f"🎯 Order ID: `{result['order_id'][:16]}...`\n\n"
                 f"⚡ Gasless transaction!\n"
-                f"🏆 Attributed to OpiPoliX!",
+                f"🏆 OpiPoliX!",
                 parse_mode="Markdown",
                 reply_markup=build_trade_keyboard(market_alias)
             )
@@ -1103,7 +1103,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     f"💰 Amount: {amount_to_sell:.2f} tokens\n\n"
                     f"🎯 Order ID: `{str(order_id)[:16]}...`\n\n"
                     f"⚡ Gasless transaction!\n"
-                    f"🏆 Attributed to OpiPoliX!",
+                    f"🏆 OpiPoliX!",
                     parse_mode="Markdown",
                     reply_markup=build_trade_keyboard(market_alias)
                 )

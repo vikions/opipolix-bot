@@ -69,7 +69,21 @@ def main():
                 line = process.stderr.readline()
                 if line:
                     # Ignore traceback lines, show only final error
-                    if not any(x in line for x in ['File "', 'Traceback', '^^^^', '^^^', 'yield']):
+                    ignore_patterns = [
+                        'File "',
+                        'Traceback',
+                        '^^^^',
+                        '^^^',
+                        'yield',
+                        'response = ',
+                        'return post(',
+                        'return request(',
+                        'headers=',
+                        'data=',
+                        ').format(',
+                        'raise '
+                    ]
+                    if not any(x in line for x in ignore_patterns):
                         print(f"[{name}] ERROR: {line.strip()}", file=sys.stderr, flush=True)
             except:
                 pass

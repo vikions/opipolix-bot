@@ -100,8 +100,19 @@ class UserClobClient:
             response = self.client.post_order(signed_order, OrderType.FOK)
             print(f"✅ Order posted: {response}")
 
+            # Extract order ID properly
+            order_id = None
+            if hasattr(response, 'orderID'):
+                order_id = response.orderID
+            elif hasattr(response, 'order_id'):
+                order_id = response.order_id
+            elif isinstance(response, dict):
+                order_id = response.get('orderID') or response.get('order_id')
+            else:
+                order_id = str(response)
+
             return {
-                "order_id": response.orderID if hasattr(response, "orderID") else str(response),
+                "order_id": order_id,
                 "amount": amount_usdc,
                 "status": "success",
             }
