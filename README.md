@@ -323,7 +323,7 @@ Built by **@vikions**
 
 - Crypto developer & prediction markets enthusiast
 - Telegram: [@OpiPoliXBot](https://t.me/OpiPoliXBot)
-- Twitter: https://x.com/vikions777
+- Twitter: https://x.com/opipolixbot
 
 ---
 
