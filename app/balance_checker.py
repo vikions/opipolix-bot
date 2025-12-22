@@ -23,8 +23,12 @@ MARKET_TOKENS = {
         "no": "77680902575693269510705775150133261883431641996305813878639196300490247886068"
     },
     "base": {
-        "yes": "TBD",  
-        "no": "TBD"
+        "yes": "104771646709660831592727707032658923058293444911215259720234012315470229507167",
+        "no": "91704486839398022652930625279905848372527977307744447009017770224967808697336"
+    },
+    "abstract": {
+        "yes": "105292534464588119413823901919588224897612305776681795693919323419047416388812",
+        "no": "98646985707839121837958202212263078387820716702786874164268337295747851893706"
     }
 }
 
@@ -108,7 +112,8 @@ class BalanceChecker:
         # Positions 
         positions = {
             'metamask': {'yes': 0.0, 'no': 0.0},
-            'base': {'yes': 0.0, 'no': 0.0}
+            'base': {'yes': 0.0, 'no': 0.0},
+            'abstract': {'yes': 0.0, 'no': 0.0}
         }
         
         if safe_address:
@@ -132,6 +137,17 @@ class BalanceChecker:
                 positions['base']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['base']['no']
+                )
+            
+            # Abstract positions
+            if MARKET_TOKENS['abstract']['yes'] != 'TBD':
+                positions['abstract']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['abstract']['yes']
+                )
+                positions['abstract']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['abstract']['no']
                 )
         
         return {
@@ -177,6 +193,17 @@ def format_balance_message(balance: Dict) -> str:
             lines.append(f"    YES: {base_yes:.2f} shares")
         if base_no > 0:
             lines.append(f"    NO: {base_no:.2f} shares")
+    
+    # Abstract
+    abstract_yes = positions['abstract']['yes']
+    abstract_no = positions['abstract']['no']
+    if abstract_yes > 0 or abstract_no > 0:
+        has_positions = True
+        lines.append("  Abstract:")
+        if abstract_yes > 0:
+            lines.append(f"    YES: {abstract_yes:.2f} shares")
+        if abstract_no > 0:
+            lines.append(f"    NO: {abstract_no:.2f} shares")
     
     if not has_positions:
         lines.append("  No positions yet")

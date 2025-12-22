@@ -125,6 +125,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
     """Build keyboard for market selection"""
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
+        [KeyboardButton("🎨 Abstract Token")],
         [KeyboardButton("🔙 Back to Trading")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -649,6 +650,8 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Will MetaMask launch a token by June 30?\n\n"
         "🔵 *Base Token 2025*\n"
         "Will Base launch a token in 2025?\n\n"
+        "🎨 *Abstract Token by Dec 31, 2026*\n"
+        "Will Abstract launch a token by December 31, 2026?\n\n"
         "Select a market to trade:",
         parse_mode="Markdown",
         reply_markup=build_markets_keyboard()
@@ -922,6 +925,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == "🔵 Base Token":
         return await market_trade_menu(update, context, "base")
+    
+    if text == "🎨 Abstract Token":
+        return await market_trade_menu(update, context, "abstract")
     
     
     if text == "🔙 Back to Trading":
