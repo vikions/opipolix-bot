@@ -1172,6 +1172,18 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         reply_markup=build_main_keyboard()
     )
 
+async def worker_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Check Auto-Trade worker status"""
+    from worker_health import get_monitor
+    
+    monitor = get_monitor()
+    status_message = monitor.format_status()
+    
+    await update.message.reply_text(
+        status_message,
+        parse_mode="Markdown"
+    )
+
 
 def main():
     if not TOKEN:
@@ -1179,7 +1191,7 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
     
-    
+    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("about", about))
@@ -1188,14 +1200,15 @@ def main():
     app.add_handler(CommandHandler("p_markets", p_markets))
     app.add_handler(CommandHandler("spread", spread))
     
-    
+    # Wallet
     app.add_handler(CommandHandler("balance", check_balance))
     app.add_handler(CommandHandler("wallet", trading_menu))
     app.add_handler(CommandHandler("deploy_safe", deploy_safe_wallet))
     app.add_handler(CommandHandler("withdraw", withdraw_command))
     app.add_handler(CommandHandler("cancel", cancel_auto_order))
+    app.add_handler(CommandHandler("worker_status", worker_status))
     
-    
+    # Text handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
     
     app.run_polling()

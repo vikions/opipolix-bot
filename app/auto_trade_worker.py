@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 from typing import Optional
@@ -12,6 +11,7 @@ from auto_trade_manager import AutoTradeManager
 from wallet_manager import WalletManager
 from market_config import get_market
 from clob_trading import trade_market
+from worker_health import get_monitor
 
 
 class AutoTradeWorker:
@@ -23,6 +23,7 @@ class AutoTradeWorker:
         self.auto_trade_manager = AutoTradeManager()
         self.wallet_manager = WalletManager()
         self.bot = Bot(token=telegram_token)
+        self.health_monitor = get_monitor()
         
         # Интервал проверки (секунды)
         self.check_interval = 10
@@ -208,9 +209,11 @@ class AutoTradeWorker:
                     
                     if result['status'] == 'success':
                         self.db.update_auto_order_status(order['id'], 'executed')
+                        self.health_monitor.mark_order_executed()
                         print(f"✅ Order #{order['id']} executed and marked as completed")
                     else:
                         self.db.update_auto_order_status(order['id'], 'failed')
+                        self.health_monitor.mark_order_failed()
                         print(f"❌ Order #{order['id']} failed and marked as failed")
                     
                     
@@ -219,6 +222,7 @@ class AutoTradeWorker:
                 
             except Exception as e:
                 print(f"❌ Error processing order #{order['id']}: {e}")
+                self.health_monitor.mark_error(str(e))
                 import traceback
                 traceback.print_exc()
     
@@ -227,6 +231,9 @@ class AutoTradeWorker:
         print("🚀 Auto-Trade Worker started!")
         print(f"⏰ Check interval: {self.check_interval} seconds")
         print(f"📊 Monitoring prices and auto-orders...\n")
+        
+        # Mark worker as started
+        self.health_monitor.mark_started()
         
         iteration = 0
         
@@ -237,21 +244,30 @@ class AutoTradeWorker:
                 
                 print(f"[{timestamp}] Iteration #{iteration}")
                 
+                # Get active orders count
+                active_orders = self.db.get_active_auto_orders()
+                active_count = len(active_orders) if active_orders else 0
                 
+                # Проверить активные ордера
                 await self.check_and_execute_orders()
                 
+                # Mark iteration
+                self.health_monitor.mark_iteration(active_count)
                 
+                # Спать до следующей проверки
                 await asyncio.sleep(self.check_interval)
                 
             except KeyboardInterrupt:
                 print("\n⏹️ Worker stopped by user")
+                self.health_monitor.mark_stopped()
                 break
             except Exception as e:
                 print(f"❌ Error in main loop: {e}")
+                self.health_monitor.mark_error(str(e))
                 import traceback
                 traceback.print_exc()
                 
-                
+                # Continue даже после ошибки
                 await asyncio.sleep(self.check_interval)
 
 
