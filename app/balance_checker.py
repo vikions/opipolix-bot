@@ -6,6 +6,7 @@ import os
 from typing import Dict
 from web3 import Web3
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
@@ -95,6 +96,50 @@ class BalanceChecker:
             print(f"Error getting position balance: {e}")
             return 0.0
     
+    def get_token_price(self, token_id: str) -> float:
+        """Get current price of token from Polymarket CLOB API"""
+        try:
+            # Use CLOB API to get price
+            response = requests.get(
+                f"https://clob.polymarket.com/prices-history",
+                params={
+                    "interval": "1m",
+                    "market": token_id,
+                    "fidelity": 1
+                },
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data and len(data) > 0:
+                    # Get latest price
+                    latest = data[-1]
+                    price = float(latest.get('price', 0))
+                    return price
+            
+            # Fallback: try orderbook
+            response = requests.get(
+                f"https://clob.polymarket.com/book",
+                params={"token_id": token_id},
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                book = response.json()
+                # Mid price = (best_bid + best_ask) / 2
+                if book.get('bids') and book.get('asks'):
+                    best_bid = float(book['bids'][0]['price']) if book['bids'] else 0
+                    best_ask = float(book['asks'][0]['price']) if book['asks'] else 0
+                    if best_bid > 0 and best_ask > 0:
+                        return (best_bid + best_ask) / 2
+            
+            return 0.0
+            
+        except Exception as e:
+            print(f"Error getting token price: {e}")
+            return 0.0
+    
     def get_full_balance(self, eoa_address: str, safe_address: str = None) -> Dict:
         
         print(f"🔍 Checking balance for EOA: {eoa_address}")
@@ -170,6 +215,9 @@ def format_balance_message(balance: Dict) -> str:
     positions = balance['positions']
     has_positions = False
     
+    # Get prices for calculation
+    checker = BalanceChecker()
+    
     lines.append("*Positions:*")
     
     # MetaMask
@@ -179,9 +227,22 @@ def format_balance_message(balance: Dict) -> str:
         has_positions = True
         lines.append("  MetaMask:")
         if mm_yes > 0:
-            lines.append(f"    YES: {mm_yes:.2f} shares")
+            # Convert raw balance to actual shares (divide by 1e6)
+            shares = mm_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['metamask']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
         if mm_no > 0:
-            lines.append(f"    NO: {mm_no:.2f} shares")
+            shares = mm_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['metamask']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
     
     # Base
     base_yes = positions['base']['yes']
@@ -190,9 +251,21 @@ def format_balance_message(balance: Dict) -> str:
         has_positions = True
         lines.append("  Base:")
         if base_yes > 0:
-            lines.append(f"    YES: {base_yes:.2f} shares")
+            shares = base_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['base']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
         if base_no > 0:
-            lines.append(f"    NO: {base_no:.2f} shares")
+            shares = base_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['base']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
     
     # Abstract
     abstract_yes = positions['abstract']['yes']
@@ -201,9 +274,21 @@ def format_balance_message(balance: Dict) -> str:
         has_positions = True
         lines.append("  Abstract:")
         if abstract_yes > 0:
-            lines.append(f"    YES: {abstract_yes:.2f} shares")
+            shares = abstract_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['abstract']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
         if abstract_no > 0:
-            lines.append(f"    NO: {abstract_no:.2f} shares")
+            shares = abstract_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['abstract']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
     
     if not has_positions:
         lines.append("  No positions yet")
