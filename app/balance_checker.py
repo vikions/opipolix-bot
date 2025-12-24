@@ -30,6 +30,10 @@ MARKET_TOKENS = {
     "abstract": {
         "yes": "105292534464588119413823901919588224897612305776681795693919323419047416388812",
         "no": "98646985707839121837958202212263078387820716702786874164268337295747851893706"
+    },
+    "extended": {
+        "yes": "80202018619101908013933944100239367385491528832020028327612486898619283802751",
+        "no": "33249883623946882498042187494418816609278977641116912274628462290026666786835"
     }
 }
 
@@ -158,7 +162,8 @@ class BalanceChecker:
         positions = {
             'metamask': {'yes': 0.0, 'no': 0.0},
             'base': {'yes': 0.0, 'no': 0.0},
-            'abstract': {'yes': 0.0, 'no': 0.0}
+            'abstract': {'yes': 0.0, 'no': 0.0},
+            'extended': {'yes': 0.0, 'no': 0.0}
         }
         
         if safe_address:
@@ -193,6 +198,17 @@ class BalanceChecker:
                 positions['abstract']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['abstract']['no']
+                )
+            
+            # Extended positions
+            if MARKET_TOKENS['extended']['yes'] != 'TBD':
+                positions['extended']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['extended']['yes']
+                )
+                positions['extended']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['extended']['no']
                 )
         
         return {
@@ -284,6 +300,29 @@ def format_balance_message(balance: Dict) -> str:
         if abstract_no > 0:
             shares = abstract_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['abstract']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+    
+    # Extended
+    extended_yes = positions['extended']['yes']
+    extended_no = positions['extended']['no']
+    if extended_yes > 0 or extended_no > 0:
+        has_positions = True
+        lines.append("  Extended:")
+        if extended_yes > 0:
+            shares = extended_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['extended']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if extended_no > 0:
+            shares = extended_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['extended']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
