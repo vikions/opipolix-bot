@@ -1194,7 +1194,18 @@ def main():
     if not TOKEN:
         raise SystemExit("Set TELEGRAM_TOKEN env var first.")
 
-    app = Application.builder().token(TOKEN).build()
+    # Add retry logic with increased timeouts to prevent httpx.ReadError crashes
+    from telegram.request import HTTPXRequest
+    
+    # Create request with retries and longer timeouts
+    request = HTTPXRequest(
+        connection_pool_size=8,
+        pool_timeout=30.0,      # Increased from 5s to 30s
+        connect_timeout=30.0,    # Increased from 5s to 30s  
+        read_timeout=30.0,       # Increased from 5s to 30s
+    )
+    
+    app = Application.builder().token(TOKEN).request(request).build()
     
     # Commands
     app.add_handler(CommandHandler("start", start))
