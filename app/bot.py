@@ -39,6 +39,10 @@ TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
 wallet_manager = WalletManager()
 
+# Initialize database for tracker
+from database import Database
+db = Database()
+
 
 HELP_TEXT = (
     "OpiPoliX Bot — crypto prediction market spread tracker.\n\n"
@@ -80,6 +84,7 @@ BTN_OPINION = "Opinion Markets"
 BTN_POLY = "Polymarket Markets"
 BTN_ABOUT = "About Bot"
 BTN_TRADING = "Trading"
+BTN_TRACKER = "Opinion Tracker"
 BTN_DEPLOY_SAFE = "🦺 Deploy Safe Wallet"
 
 
@@ -98,7 +103,8 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(BTN_SPREAD_METAMASK), KeyboardButton(BTN_SPREAD_BASE)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
-        [KeyboardButton(BTN_ABOUT), KeyboardButton(BTN_TRADING)],
+        [KeyboardButton(BTN_TRACKER), KeyboardButton(BTN_TRADING)],
+        [KeyboardButton(BTN_ABOUT)],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -872,7 +878,56 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if text == BTN_TRADING:
         return await trading_menu(update, context)
     
+    if text == BTN_TRACKER:
+        return await opinion_tracker_menu(update, context)
     
+    if text == "➕ Add Address":
+        return await add_tracked_address(update, context)
+    
+    if text == "📄 My Addresses":
+        return await show_tracked_addresses(update, context)
+    
+    if text == "🔙 Back to Tracker":
+        return await opinion_tracker_menu(update, context)
+    
+    # Handle address input for tracker
+    if context.user_data.get('awaiting_tracker_address'):
+        # Validate address format
+        if text.startswith('0x') and len(text) == 42:
+            telegram_id = update.message.from_user.id
+            
+            from database_tracker import TrackerDatabase
+            tracker_db = TrackerDatabase(db)
+            
+            # Add address
+            success = tracker_db.add_tracked_address(telegram_id, text.lower())
+            
+            if success:
+                await update.message.reply_text(
+                    f"✅ Address added!\n\n"
+                    f"`{text[:10]}...{text[-8:]}`\n\n"
+                    "🔍 Fetching positions..."
+                )
+                
+                # Show positions immediately
+                await show_address_positions(update, context, text.lower())
+                
+                # Clear flag
+                context.user_data.pop('awaiting_tracker_address', None)
+                
+                return await opinion_tracker_menu(update, context)
+            else:
+                await update.message.reply_text("❌ Error adding address. Try again.")
+        else:
+            await update.message.reply_text(
+                "❌ Invalid address format!\n\n"
+                "Address must:\n"
+                "• Start with 0x\n"
+                "• Be 42 characters long\n\n"
+                "Try again or press 🔙 Back"
+            )
+        return
+
     if text == BTN_DEPLOY_SAFE:
         return await deploy_safe_wallet(update, context)
     
@@ -1186,6 +1241,129 @@ async def worker_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     await update.message.reply_text(
         status_message,
+        parse_mode="Markdown"
+    )
+
+
+# ===== OPINION TRACKER FUNCTIONS =====
+
+async def opinion_tracker_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Opinion Tracker main menu"""
+    telegram_id = update.message.from_user.id
+    
+    from database_tracker import TrackerDatabase
+    
+    tracker_db = TrackerDatabase(db)
+    tracked = tracker_db.get_tracked_addresses(telegram_id)
+    
+    keyboard = [
+        [KeyboardButton("➕ Add Address"), KeyboardButton("📄 My Addresses")],
+        [KeyboardButton("🔙 Back to Main Menu")],
+    ]
+    
+    message = (
+        "📊 *Opinion Position Tracker*\n\n"
+        "Track any Opinion wallet's positions and balances!\n\n"
+        f"💼 Currently tracking: {len(tracked)} address(es)\n\n"
+        "➕ *Add Address* - Track a new wallet\n"
+        "📄 *My Addresses* - View tracked wallets\n\n"
+        "💡 No API key needed - track any address!"
+    )
+    
+    await update.message.reply_text(
+        message,
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+
+
+async def add_tracked_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Start process to add address"""
+    context.user_data['awaiting_tracker_address'] = True
+    
+    await update.message.reply_text(
+        "📝 *Add Opinion Address*\n\n"
+        "Send me the wallet address you want to track\n"
+        "(BNB Chain / BSC address)\n\n"
+        "Example:\n"
+        "`0xF3330Aa51fE6fC9Eb5E20f115604c82569f4C30b`\n\n"
+        "Or press 🔙 Back to cancel",
+        parse_mode="Markdown"
+    )
+
+
+async def show_tracked_addresses(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show list of tracked addresses"""
+    telegram_id = update.message.from_user.id
+    
+    from database_tracker import TrackerDatabase
+    
+    tracker_db = TrackerDatabase(db)
+    tracked = tracker_db.get_tracked_addresses(telegram_id)
+    
+    if not tracked:
+        keyboard = [
+            [KeyboardButton("➕ Add Address")],
+            [KeyboardButton("🔙 Back to Tracker")],
+        ]
+        
+        await update.message.reply_text(
+            "📄 *My Tracked Addresses*\n\n"
+            "You're not tracking any addresses yet.\n\n"
+            "Press ➕ Add Address to start!",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        )
+        return
+    
+    message = "📄 *My Tracked Addresses*\n\n"
+    
+    for idx, addr in enumerate(tracked):
+        address = addr['address']
+        nickname = addr.get('nickname') or 'No name'
+        
+        message += f"{idx + 1}. *{nickname}*\n"
+        message += f"   `{address[:10]}...{address[-8:]}`\n\n"
+    
+    message += "\n👉 Send me an address to view its positions!"
+    
+    keyboard = [
+        [KeyboardButton("➕ Add Address")],
+        [KeyboardButton("🔙 Back to Tracker")],
+    ]
+    
+    await update.message.reply_text(
+        message,
+        parse_mode="Markdown",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    )
+
+
+async def show_address_positions(update: Update, context: ContextTypes.DEFAULT_TYPE, address: str) -> None:
+    """Show positions for specific address"""
+    from opinion_tracker import get_user_positions, get_user_balances, format_positions_message, format_balances_message
+    
+    await update.message.reply_text(
+        f"🔍 Fetching data for `{address[:10]}...{address[-8:]}`\n\n"
+        "⏳ Please wait...",
+        parse_mode="Markdown"
+    )
+    
+    # Get positions
+    positions = get_user_positions(address)
+    positions_msg = format_positions_message(positions)
+    
+    await update.message.reply_text(
+        positions_msg,
+        parse_mode="Markdown"
+    )
+    
+    # Get balances
+    balances = get_user_balances(address)
+    balances_msg = format_balances_message(balances)
+    
+    await update.message.reply_text(
+        balances_msg,
         parse_mode="Markdown"
     )
 
