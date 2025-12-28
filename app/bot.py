@@ -66,14 +66,14 @@ COMMON_MARKETS = [
     {
         "alias": "metamask",
         "opinion_id": 793,
-        "polymarket_id": 604067,
-        "title": "MetaMask token 2025",
+        "polymarket_id": 657287,
+        "title": "MetaMask token by June 30, 2025",
     },
     {
         "alias": "base",
         "opinion_id": 1270,
-        "polymarket_id": 598930,
-        "title": "Base token 2025",
+        "polymarket_id": 821172,
+        "title": "Base token by June 30, 2026",
     },
 ]
 
@@ -652,10 +652,10 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
    
     await update.message.reply_text(
         "🎯 *Available Markets*\n\n"
-        "🦊 *MetaMask Token by June 30*\n"
-        "Will MetaMask launch a token by June 30?\n\n"
-        "🔵 *Base Token 2025*\n"
-        "Will Base launch a token in 2025?\n\n"
+        "🦊 *MetaMask Token by June 30, 2025*\n"
+        "Will MetaMask launch a token by June 30, 2025?\n\n"
+        "🔵 *Base Token by June 30, 2026*\n"
+        "Will Base launch a token by June 30, 2026?\n\n"
         "🎨 *Abstract Token by Dec 31, 2026*\n"
         "Will Abstract launch a token by December 31, 2026?\n\n"
         "🧬 *Extended Token by March 31, 2026*\n"
