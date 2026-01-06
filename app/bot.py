@@ -65,13 +65,13 @@ HELP_TEXT = (
 COMMON_MARKETS = [
     {
         "alias": "metamask",
-        "opinion_id": 793,
+        "opinion_id": 2103,
         "polymarket_id": 657287,
         "title": "MetaMask token by June 30, 2025",
     },
     {
         "alias": "base",
-        "opinion_id": 1270,
+        "opinion_id": 2112,
         "polymarket_id": 821172,
         "title": "Base token by June 30, 2026",
     },
