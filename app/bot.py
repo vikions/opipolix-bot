@@ -831,6 +831,57 @@ async def auto_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, ma
 
 
 
+async def show_market_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show current market information"""
+    current_market = context.user_data.get('current_market')
+    
+    if not current_market:
+        await update.message.reply_text(
+            "\u274c Market not found. Please select a market first.",
+            reply_markup=build_markets_keyboard()
+        )
+        return
+    
+    market = get_market(current_market)
+    
+    await update.message.reply_text("\u23f3 Fetching market data...")
+    
+    try:
+        # Get Polymarket prices
+        poly_prices = get_polymarket_binary_prices(market['polymarket_id'])
+        
+        if poly_prices['yes'] is not None and poly_prices['no'] is not None:
+            message = (
+                f"\U0001f4ca *Market Info*\n\n"
+                f"{market['emoji']} *{market['title']}*\n\n"
+                f"\U0001f4b0 *Current Prices:*\n"
+                f"  YES: ${poly_prices['yes']:.2f} ({poly_prices['yes']*100:.1f}%)\n"
+                f"  NO: ${poly_prices['no']:.2f} ({poly_prices['no']*100:.1f}%)\n\n"
+                f"\U0001f4a1 *Ready to trade?*\n"
+                f"Use the buttons below to buy or sell shares!"
+            )
+        else:
+            message = (
+                f"\U0001f4ca *Market Info*\n\n"
+                f"{market['emoji']} *{market['title']}*\n\n"
+                f"\u26a0\ufe0f Price data temporarily unavailable.\n"
+                f"Please try again in a moment."
+            )
+        
+        await update.message.reply_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=build_trade_keyboard(current_market)
+        )
+        
+    except Exception as e:
+        await update.message.reply_text(
+            f"\u274c Error fetching market info: {str(e)}\n\n"
+            f"Please try again.",
+            reply_markup=build_trade_keyboard(current_market)
+        )
+
+
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик кнопок"""
     text = update.message.text.strip()
@@ -1078,6 +1129,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
         
         return await auto_trade_menu(update, context, current_market)
+
+
+    if text == "\U0001f4ca Market Info":
+        return await show_market_info(update, context)
     
     
     if text in ["25%", "50%", "75%", "100%"]:
@@ -1248,35 +1303,102 @@ async def worker_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 # ===== OPINION TRACKER FUNCTIONS =====
 
 async def opinion_tracker_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Opinion Tracker main menu"""
+    """Opinion Tracker main menu with detailed position display"""
     telegram_id = update.message.from_user.id
     
     from database_tracker import TrackerDatabase
+    from opinion_tracker import get_user_positions, get_user_balances
     
     tracker_db = TrackerDatabase(db)
     tracked = tracker_db.get_tracked_addresses(telegram_id)
     
     keyboard = [
-        [KeyboardButton("➕ Add Address"), KeyboardButton("📄 My Addresses")],
-        [KeyboardButton("🔙 Back to Main Menu")],
+        [KeyboardButton("\U00002795 Add Address"), KeyboardButton("\U0001F4C4 My Addresses")],
+        [KeyboardButton("\U0001F519 Back to Main Menu")],
     ]
     
-    message = (
-        "📊 *Opinion Position Tracker*\n\n"
-        "Track any Opinion wallet's positions and balances!\n\n"
-        f"💼 Currently tracking: {len(tracked)} address(es)\n\n"
-        "➕ *Add Address* - Track a new wallet\n"
-        "📄 *My Addresses* - View tracked wallets\n\n"
-        "💡 No API key needed - track any address!"
-    )
+    if not tracked:
+        # No addresses tracked yet
+        message = (
+            "\U0001F4CA *Opinion Position Tracker*\n\n"
+            "Track any Opinion wallet's positions and balances!\n\n"
+            "\U0001F4BC No addresses tracked yet.\n\n"
+            "\U00002795 *Add Address* - Start tracking wallets\n"
+            "\U0001F4A1 No API key needed - track any address!"
+        )
+    else:
+        # Show detailed info for all tracked addresses
+        message = f"\U0001F4CA *Opinion Position Tracker*\n\n"
+        
+        for idx, addr in enumerate(tracked, 1):
+            address = addr['address']
+            
+            message += f"\U0001F4BC *Address {idx}:* `{address[:6]}...{address[-4:]}`\n"
+            
+            try:
+                # Get USDT balance
+                balances_data = get_user_balances(address)
+                
+                if balances_data.get('status') == 'success':
+                    usdt = balances_data.get('usdt_balance', 0)
+                    message += f"   \U0001F4B5 USDT: {usdt:.2f}\n"
+                else:
+                    message += f"   \U0001F4B5 USDT: Error\n"
+                
+                # Get positions
+                positions_data = get_user_positions(address)
+                
+                if positions_data.get('status') == 'success':
+                    result = positions_data.get('positions')
+                    
+                    # Handle different response types
+                    if hasattr(result, 'data'):
+                        positions = result.data if result.data else []
+                    elif isinstance(result, list):
+                        positions = result
+                    else:
+                        positions = []
+                    
+                    if positions and len(positions) > 0:
+                        message += f"\n"
+                        
+                        for pos_idx, pos in enumerate(positions[:3], 1):  # Show max 3 positions
+                            # Extract position data
+                            if hasattr(pos, 'market_id'):
+                                market_id = pos.market_id
+                                amount = pos.amount if hasattr(pos, 'amount') else 0
+                            else:
+                                market_id = pos.get('marketId', 'Unknown')
+                                amount = pos.get('amount', 0)
+                            
+                            # Format amount
+                            if isinstance(amount, (int, float)):
+                                amount_formatted = amount / 10**18
+                            else:
+                                amount_formatted = 0
+                            
+                            message += f"   \U0001F4CA Position {pos_idx}: Market #{market_id}\n"
+                            message += f"      {amount_formatted:.2f} tokens\n"
+                        
+                        if len(positions) > 3:
+                            message += f"   ... and {len(positions) - 3} more\n"
+                    else:
+                        message += f"   \U0001F4CA No positions\n"
+                else:
+                    message += f"   \U0001F4CA Error loading positions\n"
+                
+                message += f"\n"
+                
+            except Exception as e:
+                message += f"   \u26A0\uFE0F Error: {str(e)}\n\n"
+        
+        message += "\U00002795 *Add more* | \U0001F4C4 *View details*"
     
     await update.message.reply_text(
         message,
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
-
-
 async def add_tracked_address(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start process to add address"""
     context.user_data['awaiting_tracker_address'] = True
