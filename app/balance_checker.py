@@ -34,6 +34,10 @@ MARKET_TOKENS = {
     "extended": {
         "yes": "80202018619101908013933944100239367385491528832020028327612486898619283802751",
         "no": "33249883623946882498042187494418816609278977641116912274628462290026666786835"
+    },
+    "opinion_fdv": {
+        "yes": "50352926775492572007129313229442771572343916931005903007424590093174311630298",
+        "no": "24347171758774499938462633574721292772800062019156311729242237473590058137270"
     }
 }
 
@@ -163,7 +167,8 @@ class BalanceChecker:
             'metamask': {'yes': 0.0, 'no': 0.0},
             'base': {'yes': 0.0, 'no': 0.0},
             'abstract': {'yes': 0.0, 'no': 0.0},
-            'extended': {'yes': 0.0, 'no': 0.0}
+            'extended': {'yes': 0.0, 'no': 0.0},
+            'opinion_fdv': {'yes': 0.0, 'no': 0.0}
         }
         
         if safe_address:
@@ -209,6 +214,17 @@ class BalanceChecker:
                 positions['extended']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['extended']['no']
+                )
+
+            # Opinion FDV positions
+            if MARKET_TOKENS['opinion_fdv']['yes'] != 'TBD':
+                positions['opinion_fdv']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opinion_fdv']['yes']
+                )
+                positions['opinion_fdv']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opinion_fdv']['no']
                 )
         
         return {
@@ -323,6 +339,29 @@ def format_balance_message(balance: Dict) -> str:
         if extended_no > 0:
             shares = extended_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['extended']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # Opinion FDV
+    fdv_yes = positions['opinion_fdv']['yes']
+    fdv_no = positions['opinion_fdv']['no']
+    if fdv_yes > 0 or fdv_no > 0:
+        has_positions = True
+        lines.append("  Opinion FDV:")
+        if fdv_yes > 0:
+            shares = fdv_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opinion_fdv']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if fdv_no > 0:
+            shares = fdv_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opinion_fdv']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")

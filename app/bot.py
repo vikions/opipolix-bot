@@ -132,6 +132,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
         [KeyboardButton("🎨 Abstract Token"), KeyboardButton("🧬 Extended Token")],
+        [KeyboardButton("🧪 Opinion FDV")],
         [KeyboardButton("🔙 Back to Trading")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -660,6 +661,8 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Will Abstract launch a token by December 31, 2026?\n\n"
         "🧬 *Extended Token by March 31, 2026*\n"
         "Will Extended launch a token by March 31, 2026?\n\n"
+        "🧪 *Opinion FDV above $1B one day after launch?*\n"
+        "Will FDV be above $1B one day after launch?\n\n"
         "Select a market to trade:",
         parse_mode="Markdown",
         reply_markup=build_markets_keyboard()
@@ -1039,6 +1042,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == "🧬 Extended Token":
         return await market_trade_menu(update, context, "extended")
+
+    if text == "🧪 Opinion FDV":
+        return await market_trade_menu(update, context, "opinion_fdv")
     
     
     if text == "🔙 Back to Trading":

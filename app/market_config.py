@@ -65,6 +65,22 @@ MARKETS = {
         "emoji": "🧬",
         "polymarket_id": 690612,
         "slug": "will-extended-launch-a-token-by-march-31-2026"
+    },
+    "opinion_fdv": {
+        "title": "Opinion FDV above $1B one day after launch?",
+        "condition_id": "0x170e907f54cd05c3f181067798610feb95f590d5d4be2bdda699c83249e2666e",
+        "question_id": "0x170e907f54cd05c3f181067798610feb95f590d5d4be2bdda699c83249e2666e",
+        "tokens": {
+            "yes": "50352926775492572007129313229442771572343916931005903007424590093174311630298",
+            "no": "24347171758774499938462633574721292772800062019156311729242237473590058137270"
+        },
+        "clob_token_ids": {
+            "yes": "50352926775492572007129313229442771572343916931005903007424590093174311630298",
+            "no": "24347171758774499938462633574721292772800062019156311729242237473590058137270"
+        },
+        "emoji": "FDV",
+        "polymarket_id": 1068300,
+        "slug": "opinion-fdv-above-1b-one-day-after-launch"
     }
 }
 
