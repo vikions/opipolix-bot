@@ -205,6 +205,8 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not markets:
             return await update.message.reply_text("⚠️ No markets found.")
 
+        total_markets = len(markets)
+
         analytics = []
         for market in markets[:5]:
             analytics.append(analyze_market(market["id"]))
@@ -216,7 +218,7 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             message += format_market_line(idx, analysis)
 
         message += "━━━━━━━━━━━━━━━━━━━━\n"
-        message += get_summary_stats(analytics)
+        message += get_summary_stats(analytics, total_markets)
 
         await update.message.reply_text(message, parse_mode="Markdown")
     except Exception as e:

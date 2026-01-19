@@ -55,6 +55,9 @@ def get_simple_markets(limit: int = 5):
         {
             "id": m.market_id,
             "title": m.market_title,
+            "volume": getattr(m, "volume", "0"),
+            "yes_token_id": getattr(m, "yes_token_id", None),
+            "no_token_id": getattr(m, "no_token_id", None),
         }
         for m in markets
     ]
