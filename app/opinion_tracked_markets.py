@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import logging
 import re
@@ -8,6 +9,14 @@ from typing import Dict, List, Optional, Tuple
 from opinion_client import client, _extract_best_ask_price, _get_orderbook_core
 
 logger = logging.getLogger(__name__)
+
+USE_EMOJI = True
+SEPARATOR_LINE = "------------------------------"
+
+HEADER_EMOJI = "\U0001F525"
+INTRO_EMOJI = "\U0001F4C8"
+RANK_EMOJI = "\U0001F4CC"
+VOLUME_EMOJI = "\U0001F4B0"
 
 WHITELIST_CHILD_IDS = [
     3410,  # Will Nansen launch a token by March 31, 2026
@@ -58,9 +67,13 @@ _MONTH_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _YEAR_PATTERN = re.compile(r"\b20\d{2}\b")
+_DATE_WITHOUT_COMMA = re.compile(
+    r"\b(?P<month>january|february|march|april|may|june|july|august|september|october|november|december)\s+(?P<day>\d{1,2})\s+(?P<year>20\d{2})\b",
+    re.IGNORECASE,
+)
 
 INTRO_TEXT = (
-    "These are the hottest token-launch markets on Opinion right now, ranked by 24h volume."
+    "Hottest token-launch markets on Opinion right now (ranked by 24h volume)."
 )
 
 
@@ -104,6 +117,13 @@ def _coerce_int(value: object) -> Optional[int]:
         except ValueError:
             return None
     return None
+
+
+def _normalize_date_text(text: str) -> str:
+    def repl(match: re.Match) -> str:
+        return f"{match.group('month')} {match.group('day')}, {match.group('year')}"
+
+    return _DATE_WITHOUT_COMMA.sub(repl, text)
 
 
 def _looks_like_full_title(title: str, project_name: Optional[str]) -> bool:
@@ -181,10 +201,12 @@ def _get_parent_title_sync(parent_id: int) -> Optional[str]:
 def _resolve_full_title(market_id: int, child_title: str, market_obj: object) -> str:
     project_name = CHILD_TO_PROJECT.get(market_id)
     if _looks_like_full_title(child_title, project_name):
-        return child_title
+        return _normalize_date_text(child_title)
 
     if not _looks_like_date_title(child_title):
-        return child_title
+        return _normalize_date_text(child_title)
+
+    normalized_child = _normalize_date_text(child_title)
 
     parent_id = CHILD_TO_PARENT_ID.get(market_id)
     if parent_id is None:
@@ -203,12 +225,13 @@ def _resolve_full_title(market_id: int, child_title: str, market_obj: object) ->
     if parent_id:
         parent_title = _get_parent_title_sync(parent_id)
         if parent_title:
-            return _combine_parent_child_title(parent_title, child_title)
+            combined = _combine_parent_child_title(parent_title, normalized_child)
+            return _normalize_date_text(combined)
 
     if project_name:
-        return f"Will {project_name} launch a token by {child_title}"
+        return f"Will {project_name} launch a token by {normalized_child}"
 
-    return child_title
+    return normalized_child
 
 
 def _count_orders(book: object) -> int:
@@ -313,15 +336,27 @@ def format_volume(amount: float) -> str:
 def format_tracked_markets_message(markets: List[Dict], limit: Optional[int] = None) -> str:
     shown = markets if limit is None else markets[:limit]
 
+    header = (
+        f"{HEADER_EMOJI} OPINION MARKETS (Tracked Token Launch Markets)"
+        if USE_EMOJI
+        else "OPINION MARKETS (Tracked Token Launch Markets)"
+    )
+    intro = (
+        f"{INTRO_EMOJI} {INTRO_TEXT}"
+        if USE_EMOJI
+        else INTRO_TEXT
+    )
+
     lines = [
-        "?? *OPINION MARKETS (Tracked Token Launch Markets)*",
-        "????????????????????",
-        INTRO_TEXT,
+        header,
+        SEPARATOR_LINE,
+        intro,
         "",
     ]
 
     for idx, market in enumerate(shown, 1):
-        lines.append(f"?? {idx}. {market['title']}")
+        prefix = f"{RANK_EMOJI} {idx}." if USE_EMOJI else f"{idx})"
+        lines.append(f"{prefix} {market['title']}")
 
         yes_price = market.get("yes_price")
         no_price = market.get("no_price")
@@ -341,8 +376,9 @@ def format_tracked_markets_message(markets: List[Dict], limit: Optional[int] = N
 
         vol_display = format_volume(market.get("volume24h", 0.0))
         orders = market.get("orders")
-        orders_display = str(orders) if isinstance(orders, int) else "?"
-        lines.append(f"   Vol 24h: ${vol_display} | {orders_display} orders")
+        orders_display = str(orders) if isinstance(orders, int) else "\u2014"
+        vol_label = f"{VOLUME_EMOJI} Vol 24h" if USE_EMOJI else "Vol 24h"
+        lines.append(f"   {vol_label}: ${vol_display} | {orders_display} orders")
         lines.append("")
 
     return "\n".join(lines).rstrip()
