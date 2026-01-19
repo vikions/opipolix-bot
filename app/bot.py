@@ -12,7 +12,7 @@ from telegram.ext import (
     filters,
 )
 
-from opinion_client import get_simple_markets, get_opinion_binary_prices
+from opinion_client import get_opinion_binary_prices
 from polymarket_client import get_simple_poly_markets, get_polymarket_binary_prices
 
 
@@ -193,40 +193,18 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("⏳ Fetching Opinion markets (sorted by 24h volume)...")
+    await update.message.reply_text("⏳ Fetching Opinion markets (tracked list)...")
     try:
-        from opinion_analytics import (
-            analyze_market,
-            format_market_line,
-            get_summary_stats,
+        from opinion_tracked_markets import (
+            get_tracked_markets,
+            format_tracked_markets_message,
         )
 
-        markets = get_simple_markets(20)
+        markets = await get_tracked_markets()
         if not markets:
-            return await update.message.reply_text("⚠️ No markets found.")
+            return await update.message.reply_text("⚠️ No tracked markets available.")
 
-        def get_volume(market):
-            try:
-                return float(market.get("volume", 0) or 0)
-            except Exception:
-                return 0
-
-        markets_sorted = sorted(markets, key=get_volume, reverse=True)
-        total_markets = len(markets_sorted)
-
-        analytics = []
-        for market in markets_sorted:
-            analytics.append(analyze_market(market["id"]))
-
-        message = "🔥 *OPINION MARKETS (Top 20 by Volume)*\n"
-        message += "━━━━━━━━━━━━━━━━━━━━\n\n"
-
-        for idx, analysis in enumerate(analytics, 1):
-            message += format_market_line(idx, analysis)
-
-        message += "━━━━━━━━━━━━━━━━━━━━\n"
-        message += get_summary_stats(analytics, total_markets)
-
+        message = format_tracked_markets_message(markets)
         await update.message.reply_text(message, parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ Error (Opinion): {e}")
