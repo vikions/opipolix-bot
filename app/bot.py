@@ -193,18 +193,34 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("⏳ Fetching Opinion markets...")
+    await update.message.reply_text("⏳ Fetching Opinion markets analytics...")
     try:
-        markets = get_simple_markets(5)
+        from opinion_analytics import (
+            analyze_market,
+            format_market_line,
+            get_summary_stats,
+        )
+
+        markets = get_simple_markets(10)
         if not markets:
-            return await update.message.reply_text("⚠ No markets found.")
-        lines = ["Opinion Markets:\n"] + [
-            f"- {m['id']} — {m['title'][:60]}..." for m in markets
-        ]
-        await update.message.reply_text("\n".join(lines))
+            return await update.message.reply_text("⚠️ No markets found.")
+
+        analytics = []
+        for market in markets[:5]:
+            analytics.append(analyze_market(market["id"]))
+
+        message = "🔥 *OPINION MARKETS (Top 5)*\n"
+        message += "━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        for idx, analysis in enumerate(analytics, 1):
+            message += format_market_line(idx, analysis)
+
+        message += "━━━━━━━━━━━━━━━━━━━━\n"
+        message += get_summary_stats(analytics)
+
+        await update.message.reply_text(message, parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ Error (Opinion): {e}")
-
 
 async def p_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("⏳ Fetching Polymarket markets...")
