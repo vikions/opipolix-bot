@@ -193,7 +193,7 @@ async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("⏳ Fetching Opinion markets analytics...")
+    await update.message.reply_text("⏳ Fetching Opinion markets (sorted by 24h volume)...")
     try:
         from opinion_analytics import (
             analyze_market,
@@ -201,17 +201,24 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             get_summary_stats,
         )
 
-        markets = get_simple_markets(10)
+        markets = get_simple_markets(20)
         if not markets:
             return await update.message.reply_text("⚠️ No markets found.")
 
-        total_markets = len(markets)
+        def get_volume(market):
+            try:
+                return float(market.get("volume", 0) or 0)
+            except Exception:
+                return 0
+
+        markets_sorted = sorted(markets, key=get_volume, reverse=True)
+        total_markets = len(markets_sorted)
 
         analytics = []
-        for market in markets[:5]:
+        for market in markets_sorted:
             analytics.append(analyze_market(market["id"]))
 
-        message = "🔥 *OPINION MARKETS (Top 5)*\n"
+        message = "🔥 *OPINION MARKETS (Top 20 by Volume)*\n"
         message += "━━━━━━━━━━━━━━━━━━━━\n\n"
 
         for idx, analysis in enumerate(analytics, 1):
