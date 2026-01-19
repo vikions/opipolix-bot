@@ -3,10 +3,13 @@ from telegram import (
     Update,
     ReplyKeyboardMarkup,
     KeyboardButton,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
 )
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     ContextTypes,
     MessageHandler,
     filters,
@@ -109,6 +112,17 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
+def build_opinion_markets_inline_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton("Show all", callback_data="opinion_show_all")],
+        [
+            InlineKeyboardButton("AI analysis", callback_data="opinion_ai_analysis"),
+            InlineKeyboardButton("Back to menu", callback_data="back_to_main_menu"),
+        ],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
 def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
     """Build keyboard for Trading menu"""
     if safe_deployed:
@@ -204,10 +218,48 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not markets:
             return await update.message.reply_text("⚠️ No tracked markets available.")
 
-        message = format_tracked_markets_message(markets)
-        await update.message.reply_text(message, parse_mode="Markdown")
+        message = format_tracked_markets_message(markets, limit=5)
+        await update.message.reply_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=build_opinion_markets_inline_keyboard(),
+        )
     except Exception as e:
         await update.message.reply_text(f"❌ Error (Opinion): {e}")
+
+
+async def handle_opinion_markets_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+
+    data = query.data
+    if data == "opinion_ai_analysis":
+        await query.answer("Coming soon: AI analysis.", show_alert=True)
+        return
+
+    await query.answer()
+
+    if data == "opinion_show_all":
+        from opinion_tracked_markets import (
+            get_tracked_markets,
+            format_tracked_markets_message,
+        )
+
+        markets = await get_tracked_markets()
+        if not markets:
+            return await query.edit_message_text("⚠️ No tracked markets available.")
+
+        message = format_tracked_markets_message(markets)
+        await query.edit_message_text(
+            message,
+            parse_mode="Markdown",
+            reply_markup=build_opinion_markets_inline_keyboard(),
+        )
+        return
+
+    if data == "back_to_main_menu":
+        await query.message.reply_text(HELP_TEXT, reply_markup=build_main_keyboard())
 
 async def p_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("⏳ Fetching Polymarket markets...")
@@ -1532,6 +1584,13 @@ def main():
     app.add_handler(CommandHandler("withdraw", withdraw_command))
     app.add_handler(CommandHandler("cancel", cancel_auto_order))
     app.add_handler(CommandHandler("worker_status", worker_status))
+
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_opinion_markets_callback,
+            pattern="^(opinion_show_all|opinion_ai_analysis|back_to_main_menu)$",
+        )
+    )
     
     # Text handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
