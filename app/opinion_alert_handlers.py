@@ -26,11 +26,17 @@ db = Database()
 def _market_label(market_id: int) -> str:
     name = CHILD_TO_PROJECT.get(market_id)
     if name:
-        return f"{name} ({market_id})"
-    return f"Market {market_id}"
+        return name
+    return "Market"
+
+
+_MARKET_LABEL_TO_ID = {_market_label(mid): mid for mid in _TOP_MARKET_IDS}
 
 
 def _parse_market_id(text: str) -> Optional[int]:
+    market_id = _MARKET_LABEL_TO_ID.get(text)
+    if market_id is not None:
+        return market_id
     match = _MARKET_ID_PATTERN.search(text)
     if not match:
         return None

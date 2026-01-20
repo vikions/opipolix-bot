@@ -28,6 +28,7 @@ class OpinionPriceMonitor:
                 return None
 
             self.current_prices[market_id] = yes_price
+            print(f"[Opinion] Current price for {market_id}: ${yes_price:.4f}")
 
             if market_id not in self.initial_prices:
                 self.initial_prices[market_id] = yes_price
