@@ -87,6 +87,19 @@ class Database:
                     FOREIGN KEY (telegram_id) REFERENCES user_wallets(telegram_id)
                 )
             """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS opinion_alerts (
+                    id SERIAL PRIMARY KEY,
+                    telegram_id BIGINT NOT NULL,
+                    market_id INTEGER NOT NULL,
+                    alert_type TEXT NOT NULL,
+                    trigger_percent REAL NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    triggered_at TIMESTAMP
+                )
+            """)
         else:
             # SQLite syntax
             cursor.execute("""
@@ -128,6 +141,19 @@ class Database:
                     status TEXT DEFAULT 'pending',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (telegram_id) REFERENCES user_wallets(telegram_id)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS opinion_alerts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    telegram_id INTEGER NOT NULL,
+                    market_id INTEGER NOT NULL,
+                    alert_type TEXT NOT NULL,
+                    trigger_percent REAL NOT NULL,
+                    status TEXT DEFAULT 'active',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    triggered_at TIMESTAMP
                 )
             """)
         
@@ -303,6 +329,119 @@ class Database:
                 SET status = ?, executed_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (status, order_id))
+        
+        conn.commit()
+        conn.close()
+    
+    # ===== OPINION ALERT METHODS =====
+    
+    def create_opinion_alert(
+        self,
+        telegram_id: int,
+        market_id: int,
+        alert_type: str,
+        trigger_percent: float
+    ) -> int:
+        
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        if self.use_postgres:
+            cursor.execute("""
+                INSERT INTO opinion_alerts
+                (telegram_id, market_id, alert_type, trigger_percent)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (telegram_id, market_id, alert_type, trigger_percent))
+            alert_id = cursor.fetchone()[0]
+        else:
+            cursor.execute("""
+                INSERT INTO opinion_alerts
+                (telegram_id, market_id, alert_type, trigger_percent)
+                VALUES (?, ?, ?, ?)
+            """, (telegram_id, market_id, alert_type, trigger_percent))
+            alert_id = cursor.lastrowid
+        
+        conn.commit()
+        conn.close()
+        
+        return alert_id
+    
+    def get_user_opinion_alerts(self, telegram_id: int) -> list:
+        
+        conn = self.get_connection()
+        
+        if self.use_postgres:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT * FROM opinion_alerts
+                WHERE telegram_id = %s
+                ORDER BY created_at DESC
+            """, (telegram_id,))
+        else:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM opinion_alerts
+                WHERE telegram_id = ?
+                ORDER BY created_at DESC
+            """, (telegram_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def get_active_opinion_alerts(self) -> list:
+        
+        conn = self.get_connection()
+        
+        if self.use_postgres:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+        else:
+            cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM opinion_alerts
+            WHERE status = 'active'
+            ORDER BY created_at DESC
+        """)
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+    
+    def update_opinion_alert_status(self, alert_id: int, status: str):
+        
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        if status == 'triggered':
+            if self.use_postgres:
+                cursor.execute("""
+                    UPDATE opinion_alerts
+                    SET status = %s, triggered_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (status, alert_id))
+            else:
+                cursor.execute("""
+                    UPDATE opinion_alerts
+                    SET status = ?, triggered_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (status, alert_id))
+        else:
+            if self.use_postgres:
+                cursor.execute("""
+                    UPDATE opinion_alerts
+                    SET status = %s
+                    WHERE id = %s
+                """, (status, alert_id))
+            else:
+                cursor.execute("""
+                    UPDATE opinion_alerts
+                    SET status = ?
+                    WHERE id = ?
+                """, (status, alert_id))
         
         conn.commit()
         conn.close()

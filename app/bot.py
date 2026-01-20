@@ -35,6 +35,16 @@ from auto_trade_handlers import (
     handle_pending_auto_trade_input,
     handle_my_active_orders
 )
+from opinion_alert_handlers import (
+    ALERTS_CREATE_TEXT,
+    ALERTS_LIST_TEXT,
+    ALERTS_BACK_TEXT,
+    handle_create_opinion_alert,
+    handle_my_opinion_alerts,
+    handle_pending_opinion_alert_input,
+    show_opinion_alerts_menu,
+    cancel_opinion_alert,
+)
 from cancel_order_handler import cancel_auto_order
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -114,7 +124,10 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
 
 def build_opinion_markets_inline_keyboard() -> InlineKeyboardMarkup:
     rows = [
-        [InlineKeyboardButton("Show all", callback_data="opinion_show_all")],
+        [
+            InlineKeyboardButton("🔔 Alerts", callback_data="opinion_alerts"),
+            InlineKeyboardButton("Show all", callback_data="opinion_show_all"),
+        ],
         [
             InlineKeyboardButton("AI analysis", callback_data="opinion_ai_analysis"),
             InlineKeyboardButton("Back to menu", callback_data="back_to_main_menu"),
@@ -239,6 +252,10 @@ async def handle_opinion_markets_callback(update: Update, context: ContextTypes.
         return
 
     await query.answer()
+
+    if data == "opinion_alerts":
+        await show_opinion_alerts_menu(query.message, context)
+        return
 
     if data == "opinion_show_all":
         from opinion_tracked_markets import (
@@ -952,6 +969,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if await handle_pending_auto_trade_input(update, context, text):
         return
     
+    if await handle_pending_opinion_alert_input(update, context, text):
+        return
+    
     
     if context.user_data.get('pending_trade'):
         try:
@@ -989,6 +1009,16 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == BTN_TRACKER:
         return await opinion_tracker_menu(update, context)
+
+    if text == ALERTS_CREATE_TEXT:
+        return await handle_create_opinion_alert(update, context)
+
+    if text == ALERTS_LIST_TEXT:
+        return await handle_my_opinion_alerts(update, context)
+
+    if text == ALERTS_BACK_TEXT:
+        context.user_data.pop("pending_opinion_alert", None)
+        return await o_markets(update, context)
     
     if text == "➕ Add Address":
         return await add_tracked_address(update, context)
@@ -1583,12 +1613,13 @@ def main():
     app.add_handler(CommandHandler("deploy_safe", deploy_safe_wallet))
     app.add_handler(CommandHandler("withdraw", withdraw_command))
     app.add_handler(CommandHandler("cancel", cancel_auto_order))
+    app.add_handler(CommandHandler("cancelalert", cancel_opinion_alert))
     app.add_handler(CommandHandler("worker_status", worker_status))
 
     app.add_handler(
         CallbackQueryHandler(
             handle_opinion_markets_callback,
-            pattern="^(opinion_show_all|opinion_ai_analysis|back_to_main_menu)$",
+            pattern="^(opinion_alerts|opinion_show_all|opinion_ai_analysis|back_to_main_menu)$",
         )
     )
     

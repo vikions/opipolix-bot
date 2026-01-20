@@ -16,23 +16,38 @@ run_bot() {
     done
 }
 
-# Function to run worker with restart
-run_worker() {
+# Function to run auto-trade worker with restart
+run_auto_trade_worker() {
     while true; do
-        echo "▶️  Starting worker..."
+        echo "▶️  Starting auto-trade worker..."
         python app/auto_trade_worker.py
         EXIT_CODE=$?
         
-        echo "❌ Worker crashed with exit code $EXIT_CODE"
+        echo "❌ Auto-trade worker crashed with exit code $EXIT_CODE"
         echo "⏳ Waiting 5 seconds before restart..."
         sleep 5
-        echo "🔄 Restarting worker..."
+        echo "🔄 Restarting auto-trade worker..."
     done
 }
 
-# Run both in background with auto-restart
-run_bot &
-run_worker &
+# Function to run opinion alert worker with restart
+run_opinion_alert_worker() {
+    while true; do
+        echo "▶️  Starting opinion alert worker..."
+        python app/opinion_alert_worker.py
+        EXIT_CODE=$?
+        
+        echo "❌ Opinion alert worker crashed with exit code $EXIT_CODE"
+        echo "⏳ Waiting 5 seconds before restart..."
+        sleep 5
+        echo "🔄 Restarting opinion alert worker..."
+    done
+}
 
-# Wait forever (both processes restart automatically)
+# Run all three in background with auto-restart
+run_bot &
+run_auto_trade_worker &
+run_opinion_alert_worker &
+
+# Wait forever (all processes restart automatically)
 wait
