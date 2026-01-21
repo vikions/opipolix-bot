@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from opinion_client import get_opinion_binary_prices
-from polymarket_client import get_simple_poly_markets, get_polymarket_binary_prices
+from polymarket_client import get_polymarket_binary_prices
 
 
 from wallet_manager import WalletManager
@@ -130,6 +130,16 @@ def build_opinion_markets_inline_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("AI analysis", callback_data="opinion_ai_analysis"),
+            InlineKeyboardButton("Back to menu", callback_data="back_to_main_menu"),
+        ],
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+def build_polymarket_markets_inline_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton("Show all", callback_data="polymarket_show_all"),
             InlineKeyboardButton("Back to menu", callback_data="back_to_main_menu"),
         ],
     ]
@@ -279,18 +289,53 @@ async def handle_opinion_markets_callback(update: Update, context: ContextTypes.
         await query.message.reply_text(HELP_TEXT, reply_markup=build_main_keyboard())
 
 async def p_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("⏳ Fetching Polymarket markets...")
+    await update.message.reply_text("Fetching Polymarket markets (tracked list)...")
     try:
-        markets = get_simple_poly_markets(5)
-        if not markets:
-            return await update.message.reply_text("⚠ No markets found.")
-        lines = ["Polymarket Markets:\n"] + [
-            f"- {m['id']} — {m['title'][:60]}..." for m in markets
-        ]
-        await update.message.reply_text("\n".join(lines))
-    except Exception as e:
-        await update.message.reply_text(f"❌ Error (Polymarket): {e}")
+        from polymarket_tracked_markets import (
+            get_tracked_markets,
+            format_tracked_markets_message,
+        )
 
+        markets = await get_tracked_markets()
+        if not markets:
+            return await update.message.reply_text("No tracked markets available.")
+
+        message = format_tracked_markets_message(markets, limit=5)
+        await update.message.reply_text(
+            message,
+            reply_markup=build_polymarket_markets_inline_keyboard(),
+        )
+    except Exception as e:
+        await update.message.reply_text(f"Error (Polymarket): {e}")
+
+
+async def handle_polymarket_markets_callback(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    query = update.callback_query
+    if not query:
+        return
+
+    data = query.data
+    if data != "polymarket_show_all":
+        return
+
+    await query.answer()
+
+    from polymarket_tracked_markets import (
+        get_tracked_markets,
+        format_tracked_markets_message,
+    )
+
+    markets = await get_tracked_markets()
+    if not markets:
+        return await query.edit_message_text("No tracked markets available.")
+
+    message = format_tracked_markets_message(markets)
+    await query.edit_message_text(
+        message,
+        reply_markup=build_polymarket_markets_inline_keyboard(),
+    )
 
 async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, alias: str) -> None:
     alias = alias.lower()
@@ -1625,6 +1670,12 @@ def main():
         CallbackQueryHandler(
             handle_opinion_markets_callback,
             pattern="^(opinion_alerts|opinion_show_all|opinion_ai_analysis|back_to_main_menu)$",
+        )
+    )
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_polymarket_markets_callback,
+            pattern="^polymarket_show_all$",
         )
     )
     
