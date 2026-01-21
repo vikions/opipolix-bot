@@ -38,6 +38,10 @@ MARKET_TOKENS = {
     "opinion_fdv": {
         "yes": "50352926775492572007129313229442771572343916931005903007424590093174311630298",
         "no": "24347171758774499938462633574721292772800062019156311729242237473590058137270"
+    },
+    "opensea_fdv": {
+        "yes": "55736535775539231856682158017890031261644294952589300517957218393676136917293",
+        "no": "71718402031669298364238907670733752499185585238670546354636156779359681992646"
     }
 }
 
@@ -168,7 +172,8 @@ class BalanceChecker:
             'base': {'yes': 0.0, 'no': 0.0},
             'abstract': {'yes': 0.0, 'no': 0.0},
             'extended': {'yes': 0.0, 'no': 0.0},
-            'opinion_fdv': {'yes': 0.0, 'no': 0.0}
+            'opinion_fdv': {'yes': 0.0, 'no': 0.0},
+            'opensea_fdv': {'yes': 0.0, 'no': 0.0}
         }
         
         if safe_address:
@@ -225,6 +230,17 @@ class BalanceChecker:
                 positions['opinion_fdv']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['opinion_fdv']['no']
+                )
+
+            # Opensea FDV positions
+            if MARKET_TOKENS['opensea_fdv']['yes'] != 'TBD':
+                positions['opensea_fdv']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opensea_fdv']['yes']
+                )
+                positions['opensea_fdv']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opensea_fdv']['no']
                 )
         
         return {
@@ -362,6 +378,29 @@ def format_balance_message(balance: Dict) -> str:
         if fdv_no > 0:
             shares = fdv_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['opinion_fdv']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # Opensea FDV
+    opensea_yes = positions['opensea_fdv']['yes']
+    opensea_no = positions['opensea_fdv']['no']
+    if opensea_yes > 0 or opensea_no > 0:
+        has_positions = True
+        lines.append("  Opensea FDV:")
+        if opensea_yes > 0:
+            shares = opensea_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opensea_fdv']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if opensea_no > 0:
+            shares = opensea_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opensea_fdv']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")

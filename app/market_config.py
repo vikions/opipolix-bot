@@ -81,6 +81,22 @@ MARKETS = {
         "emoji": "FDV",
         "polymarket_id": 1068300,
         "slug": "opinion-fdv-above-1b-one-day-after-launch"
+    },
+    "opensea_fdv": {
+        "title": "Opensea FDV above $1B one day after launch?",
+        "condition_id": "0xe67c947bf8eeb8dffdeea19806cf266fe65f6d20f3e5bbf5135e11e544fe9b7f",
+        "question_id": "0xe67c947bf8eeb8dffdeea19806cf266fe65f6d20f3e5bbf5135e11e544fe9b7f",
+        "tokens": {
+            "yes": "55736535775539231856682158017890031261644294952589300517957218393676136917293",
+            "no": "71718402031669298364238907670733752499185585238670546354636156779359681992646"
+        },
+        "clob_token_ids": {
+            "yes": "55736535775539231856682158017890031261644294952589300517957218393676136917293",
+            "no": "71718402031669298364238907670733752499185585238670546354636156779359681992646"
+        },
+        "emoji": "💎",
+        "polymarket_id": 618455,
+        "slug": "opensea-fdv-above-1b-one-day-after-launch"
     }
 }
 
