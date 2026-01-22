@@ -121,15 +121,16 @@ COMMON_MARKETS = [
 ]
 
 
-BTN_SPREAD_TGE = "Spread TGE Tokens"
+BTN_SPREAD_TGE = "? Spread TGE Tokens ?"
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
 BTN_POLY = "Polymarket Markets"
 BTN_ABOUT = "About Bot"
-BTN_TRADING = "Trading"
+BTN_TRADING = "?? Trading"
 BTN_TRACKER = "Opinion Tracker"
 BTN_DEPLOY_SAFE = "🦺 Deploy Safe Wallet"
+BTN_MAIN_MENU = "?? Main Menu"
 
 SPREAD_TGE_BUTTONS = [
     ("MetaMask (June 30)", "metamask"),
@@ -170,7 +171,7 @@ def build_spread_tge_keyboard() -> ReplyKeyboardMarkup:
         [KeyboardButton("Nansen (June 30)"), KeyboardButton("Loopscale (June 30)")],
         [KeyboardButton("Theo (March 31)"), KeyboardButton("Tempo (March 31)")],
         [KeyboardButton("Abstract (Dec 31)")],
-        [KeyboardButton("🔙 Back to Main Menu")],
+        [KeyboardButton(BTN_MAIN_MENU)],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -1093,6 +1094,13 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(
             "Select a market to see the spread between Opinion and Polymarket.",
             reply_markup=build_spread_tge_keyboard(),
+        )
+        return
+
+    if text == BTN_MAIN_MENU:
+        await update.message.reply_text(
+            "📱 Main Menu",
+            reply_markup=build_main_keyboard(),
         )
         return
 
