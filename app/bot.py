@@ -80,7 +80,7 @@ COMMON_MARKETS = [
         "alias": "metamask",
         "opinion_id": 2103,
         "polymarket_id": 657287,
-        "title": "MetaMask token by June 30, 2025",
+        "title": "MetaMask token by June 30, 2026",
     },
     {
         "alias": "base",
@@ -88,9 +88,40 @@ COMMON_MARKETS = [
         "polymarket_id": 821172,
         "title": "Base token by June 30, 2026",
     },
+    {
+        "alias": "nansen",
+        "opinion_id": 3411,
+        "polymarket_id": 1038566,
+        "title": "Nansen token by June 30, 2026",
+    },
+    {
+        "alias": "loopscale",
+        "opinion_id": 3407,
+        "polymarket_id": 1038641,
+        "title": "Loopscale token by June 30, 2026",
+    },
+    {
+        "alias": "theo",
+        "opinion_id": 2596,
+        "polymarket_id": 706859,
+        "title": "Theo token by March 31, 2026",
+    },
+    {
+        "alias": "tempo",
+        "opinion_id": 2994,
+        "polymarket_id": 704135,
+        "title": "Tempo token by March 31, 2026",
+    },
+    {
+        "alias": "abstract",
+        "opinion_id": 2566,
+        "polymarket_id": 718188,
+        "title": "Abstract token by Dec 31, 2026",
+    },
 ]
 
 
+BTN_SPREAD_TGE = "Spread TGE Tokens"
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
@@ -99,6 +130,17 @@ BTN_ABOUT = "About Bot"
 BTN_TRADING = "Trading"
 BTN_TRACKER = "Opinion Tracker"
 BTN_DEPLOY_SAFE = "🦺 Deploy Safe Wallet"
+
+SPREAD_TGE_BUTTONS = [
+    ("MetaMask (June 30)", "metamask"),
+    ("Base (June 30)", "base"),
+    ("Nansen (June 30)", "nansen"),
+    ("Loopscale (June 30)", "loopscale"),
+    ("Theo (March 31)", "theo"),
+    ("Tempo (March 31)", "tempo"),
+    ("Abstract (Dec 31)", "abstract"),
+]
+SPREAD_TGE_BUTTON_MAP = {label: alias for label, alias in SPREAD_TGE_BUTTONS}
 
 
 # ===== HELPER FUNCTION =====
@@ -114,10 +156,21 @@ def format_tx_hash(tx_hash):
 
 def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
-        [KeyboardButton(BTN_SPREAD_METAMASK), KeyboardButton(BTN_SPREAD_BASE)],
+        [KeyboardButton(BTN_SPREAD_TGE)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
         [KeyboardButton(BTN_TRACKER), KeyboardButton(BTN_TRADING)],
         [KeyboardButton(BTN_ABOUT)],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def build_spread_tge_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [KeyboardButton("MetaMask (June 30)"), KeyboardButton("Base (June 30)")],
+        [KeyboardButton("Nansen (June 30)"), KeyboardButton("Loopscale (June 30)")],
+        [KeyboardButton("Theo (March 31)"), KeyboardButton("Tempo (March 31)")],
+        [KeyboardButton("Abstract (Dec 31)")],
+        [KeyboardButton("🔙 Back to Main Menu")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -1036,6 +1089,17 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             pass
     
     
+    if text == BTN_SPREAD_TGE:
+        await update.message.reply_text(
+            "Select a market to see the spread between Opinion and Polymarket.",
+            reply_markup=build_spread_tge_keyboard(),
+        )
+        return
+
+    spread_alias = SPREAD_TGE_BUTTON_MAP.get(text)
+    if spread_alias:
+        return await _spread_for_alias(update, context, spread_alias)
+
     if text == BTN_SPREAD_METAMASK:
         return await _spread_for_alias(update, context, "metamask")
     
