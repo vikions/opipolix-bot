@@ -121,16 +121,16 @@ COMMON_MARKETS = [
 ]
 
 
-BTN_SPREAD_TGE = "? Spread TGE Tokens ?"
+BTN_SPREAD_TGE = "✨ Spread TGE Tokens ✨"
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
 BTN_POLY = "Polymarket Markets"
 BTN_ABOUT = "About Bot"
-BTN_TRADING = "?? Trading"
+BTN_TRADING = "🔥 Trading"
 BTN_TRACKER = "Opinion Tracker"
 BTN_DEPLOY_SAFE = "🦺 Deploy Safe Wallet"
-BTN_MAIN_MENU = "?? Main Menu"
+BTN_MAIN_MENU = "🏠 Main Menu"
 
 SPREAD_TGE_BUTTONS = [
     ("MetaMask (June 30)", "metamask"),
