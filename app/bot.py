@@ -1170,7 +1170,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if text == TGE_ALERTS_BACK_TEXT:
         await update.message.reply_text(
-            "???? Main Menu",
+            "📱 Main Menu",
             reply_markup=build_main_keyboard(),
         )
         return

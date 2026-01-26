@@ -161,17 +161,13 @@ async def handle_pending_tge_alert_input(
             discord_channel_id=discord_channel_id,
             keywords=DEFAULT_TGE_KEYWORDS,
             active=True,
-        )
-
-        keywords_display = format_keywords(DEFAULT_TGE_KEYWORDS)
-        channel_label = discord_channel_id or "not configured"
-
-        message = (
+        )        message = (
             "✅ Alert created.\n\n"
             f"🔔 Project: {project_name}\n"
-            f"📢 Channel: {channel_label}\n"
-            f"🔑 Keywords: {keywords_display}\n"
-            f"⏰ Check interval: 30s\n"
+            "OpiPoliX monitors the project's social channels and will notify you "
+            "immediately about token/TGE/listing updates so you can act fast on "
+            "Opinion or Polymarket.\n\n"
+            "⏰ Check interval: 30s\n"
             f"Alert ID: {alert_id}\n"
         )
 
