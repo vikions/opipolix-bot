@@ -51,10 +51,11 @@ class TgeAlertWorker:
 
         alerts = self.db.get_active_alerts()
         if not alerts:
-            logger.debug("No active TGE alerts for Discord")
+            logger.info("TGE Discord check: no active alerts")
             return
 
         projects = self._group_alerts_by_project(alerts)
+        logger.info("TGE Discord check: %s alerts across %s projects", len(alerts), len(projects))
 
         for project_name, data in projects.items():
             try:
@@ -63,6 +64,7 @@ class TgeAlertWorker:
                     logger.info("Discord channel not configured for %s", project_name)
                     continue
 
+                logger.info("Discord scan %s (channel %s)", project_name, channel_id)
                 messages = await self.discord_monitor.fetch_messages(channel_id, limit=10)
                 if not messages:
                     continue
@@ -78,6 +80,7 @@ class TgeAlertWorker:
                 new_messages = self._filter_new_messages(messages, last_seen)
                 if not new_messages:
                     continue
+                logger.info("New Discord messages for %s: %s", project_name, len(new_messages))
 
                 config = get_project_config(project_name)
                 channel_label = self._format_channel_label(channel_id, config)
@@ -115,6 +118,7 @@ class TgeAlertWorker:
 
         while self._running:
             try:
+                logger.info("TGE check tick")
                 await self.check_discord_alerts()
             except Exception:
                 logger.exception("Unexpected error during TGE alert checks")

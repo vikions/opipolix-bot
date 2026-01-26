@@ -18,7 +18,7 @@ TGE_ALERTS_REMOVE_TEXT = "🔕 Remove Alert"
 TGE_ALERTS_BACK_TEXT = "🔙 Back"
 TGE_ALERTS_ENABLE_TEXT = "✅ Enable Alert"
 TGE_ALERTS_DISABLE_TEXT = "🔕 Disable Alert"
-TGE_ALERTS_SOON_TEXT = "Soon more"
+TGE_ALERTS_SOON_TEXT = "More markets coming soon"
 
 
 db = TgeAlertDatabase()
@@ -139,7 +139,7 @@ async def handle_pending_tge_alert_input(
     if step == "project":
         if text == TGE_ALERTS_SOON_TEXT:
             await update.message.reply_text(
-                "More projects coming soon.",
+                "More markets coming soon.",
                 reply_markup=build_tge_projects_keyboard(),
             )
             return True
@@ -167,10 +167,11 @@ async def handle_pending_tge_alert_input(
         channel_label = discord_channel_id or "not configured"
 
         message = (
-            "Alert created.\n\n"
-            f"Project: {project_name}\n"
-            f"Discord channel: {channel_label}\n"
-            f"Keywords: {keywords_display}\n"
+            "✅ Alert created.\n\n"
+            f"🔔 Project: {project_name}\n"
+            f"📢 Channel: {channel_label}\n"
+            f"🔑 Keywords: {keywords_display}\n"
+            f"⏰ Check interval: 30s\n"
             f"Alert ID: {alert_id}\n"
         )
 

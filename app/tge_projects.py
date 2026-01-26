@@ -2,14 +2,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
-try:
-    from opinion_tracked_markets import WHITELIST_CHILD_IDS, CHILD_TO_PROJECT
-except Exception:
-    WHITELIST_CHILD_IDS = []
-    CHILD_TO_PROJECT = {}
 
-
-FALLBACK_PROJECTS = ["Base", "MetaMask"]
+PROJECT_NAMES = ["Base", "Opinion"]
 
 DISCORD_PROJECTS = {
     "Base": {
@@ -40,22 +34,7 @@ def _project_key(name: str) -> str:
 
 
 def list_project_names() -> List[str]:
-    names = []
-    for market_id in WHITELIST_CHILD_IDS:
-        name = CHILD_TO_PROJECT.get(market_id)
-        if not name:
-            continue
-        if name not in names:
-            names.append(name)
-
-    if not names:
-        names.extend(FALLBACK_PROJECTS)
-
-    for extra in ("Base", "Opinion"):
-        if extra not in names:
-            names.append(extra)
-
-    return names
+    return list(PROJECT_NAMES)
 
 
 def match_project_name(text: str) -> Optional[str]:
