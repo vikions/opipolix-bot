@@ -1,6 +1,9 @@
 # Telegram Bot
 python-telegram-bot==21.4
 
+# TGE Alerts
+discum>=1.4.1
+
 # Environment variables
 python-dotenv
 

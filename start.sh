@@ -44,10 +44,25 @@ run_opinion_alert_worker() {
     done
 }
 
-# Run all three in background with auto-restart
+# Function to run TGE alert worker with restart
+run_tge_alert_worker() {
+    while true; do
+        echo "▶️  Starting TGE alert worker..."
+        python app/tge_alert_worker.py
+        EXIT_CODE=$?
+        
+        echo "❌ TGE alert worker crashed with exit code $EXIT_CODE"
+        echo "❌ Waiting 5 seconds before restart..."
+        sleep 5
+        echo "🔄 Restarting TGE alert worker..."
+    done
+}
+
+# Run all workers in background with auto-restart
 run_bot &
 run_auto_trade_worker &
 run_opinion_alert_worker &
+run_tge_alert_worker &
 
 # Wait forever (all processes restart automatically)
 wait

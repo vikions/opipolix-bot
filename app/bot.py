@@ -45,6 +45,21 @@ from opinion_alert_handlers import (
     show_opinion_alerts_menu,
     cancel_opinion_alert,
 )
+from tge_alert_handlers import (
+    TGE_ALERTS_MENU_TEXT,
+    TGE_ALERTS_ADD_TEXT,
+    TGE_ALERTS_LIST_TEXT,
+    TGE_ALERTS_REMOVE_TEXT,
+    TGE_ALERTS_BACK_TEXT,
+    TGE_ALERTS_ENABLE_TEXT,
+    TGE_ALERTS_DISABLE_TEXT,
+    handle_add_tge_alert,
+    handle_my_tge_alerts,
+    handle_remove_tge_alert,
+    handle_toggle_tge_alert,
+    handle_pending_tge_alert_input,
+    show_tge_alerts_menu,
+)
 from cancel_order_handler import cancel_auto_order
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -122,6 +137,7 @@ COMMON_MARKETS = [
 
 
 BTN_SPREAD_TGE = "✨ Spread TGE Tokens ✨"
+BTN_TGE_ALERTS = TGE_ALERTS_MENU_TEXT
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
@@ -158,6 +174,7 @@ def format_tx_hash(tx_hash):
 def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(BTN_SPREAD_TGE)],
+        [KeyboardButton(BTN_TGE_ALERTS)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
         [KeyboardButton(BTN_TRACKER), KeyboardButton(BTN_TRADING)],
         [KeyboardButton(BTN_ABOUT)],
@@ -1072,6 +1089,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if await handle_pending_opinion_alert_input(update, context, text):
         return
+
+    if await handle_pending_tge_alert_input(update, context, text):
+        return
     
     
     if context.user_data.get('pending_trade'):
@@ -1095,6 +1115,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             "Select a market to see the spread between Opinion and Polymarket.",
             reply_markup=build_spread_tge_keyboard(),
         )
+        return
+
+    if text == BTN_TGE_ALERTS:
+        await show_tge_alerts_menu(update.message, context)
         return
 
     if text == BTN_MAIN_MENU:
@@ -1128,6 +1152,28 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == BTN_TRACKER:
         return await opinion_tracker_menu(update, context)
+
+    if text == TGE_ALERTS_ADD_TEXT:
+        return await handle_add_tge_alert(update, context)
+
+    if text == TGE_ALERTS_LIST_TEXT:
+        return await handle_my_tge_alerts(update, context)
+
+    if text == TGE_ALERTS_REMOVE_TEXT:
+        return await handle_remove_tge_alert(update, context)
+
+    if text == TGE_ALERTS_ENABLE_TEXT:
+        return await handle_toggle_tge_alert(update, context, True)
+
+    if text == TGE_ALERTS_DISABLE_TEXT:
+        return await handle_toggle_tge_alert(update, context, False)
+
+    if text == TGE_ALERTS_BACK_TEXT:
+        await update.message.reply_text(
+            "???? Main Menu",
+            reply_markup=build_main_keyboard(),
+        )
+        return
 
     if text == ALERTS_CREATE_TEXT:
         return await handle_create_opinion_alert(update, context)
