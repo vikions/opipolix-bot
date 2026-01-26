@@ -161,7 +161,9 @@ async def handle_pending_tge_alert_input(
             discord_channel_id=discord_channel_id,
             keywords=DEFAULT_TGE_KEYWORDS,
             active=True,
-        )        message = (
+        )
+
+        message = (
             "✅ Alert created.\n\n"
             f"🔔 Project: {project_name}\n"
             "OpiPoliX monitors the project's social channels and will notify you "
