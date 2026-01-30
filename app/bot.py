@@ -194,6 +194,12 @@ def get_orderbook_spread(token_id: str) -> tuple[float | None, float | None, flo
         if asks:
             best_ask = float(asks[0].get("price", 0))
 
+        # Normalize if API returns cents (e.g., 12 instead of 0.12)
+        max_price = max(p for p in [best_bid, best_ask] if p is not None)
+        if max_price > 1:
+            best_bid = best_bid / 100 if best_bid is not None else None
+            best_ask = best_ask / 100 if best_ask is not None else None
+
         if best_bid is None or best_ask is None:
             return best_bid, best_ask, None
 
@@ -210,12 +216,16 @@ def format_spread_status(spread_cents: float) -> str:
     return "bad"
 
 
-def format_spread_line(label: str, spread: float | None) -> str:
+def format_spread_value(spread: float | None) -> str:
     if spread is None:
-        return f"{label}: N/A"
+        return "N/A"
     spread_cents = spread * 100
+    if abs(spread_cents - round(spread_cents)) < 0.05:
+        spread_display = f"{round(spread_cents):.0f}¢"
+    else:
+        spread_display = f"{spread_cents:.1f}¢"
     status = format_spread_status(spread_cents)
-    return f"{label}: {spread_cents:.1f}c ({status})"
+    return f"{spread_display} ({status})"
 
 
 def build_main_keyboard() -> ReplyKeyboardMarkup:
@@ -938,20 +948,10 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     market = get_market(market_alias)
 
     spread_yes = get_orderbook_spread(market['tokens']['yes'])[2]
-    spread_no = get_orderbook_spread(market['tokens']['no'])[2]
-
-    spread_lines = [
-        "📏 *Order book spread*",
-        format_spread_line("YES", spread_yes),
-        format_spread_line("NO", spread_no),
-    ]
-    if any(
-        spread is not None and (spread * 100) > 4
-        for spread in (spread_yes, spread_no)
-    ):
-        spread_lines.append("⚠️ Wide spread — market order may be expensive.")
-
-    spread_block = "\n".join(spread_lines) + "\n\n"
+    spread_block = f"📏 *Order book spread*: {format_spread_value(spread_yes)}\n"
+    if spread_yes is not None and (spread_yes * 100) > 4:
+        spread_block += "⚠️ Wide spread — market order may be expensive.\n"
+    spread_block += "\n"
 
     await update.message.reply_text(
         f"{market['emoji']} *{market['title']}*\n\n"
