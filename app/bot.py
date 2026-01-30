@@ -206,14 +206,6 @@ def get_orderbook_spread(token_id: str) -> tuple[float | None, float | None, flo
         return None, None, None
 
 
-def format_spread_status(spread_cents: float) -> str:
-    if spread_cents < 2:
-        return "good"
-    if spread_cents <= 4:
-        return "ok"
-    return "bad"
-
-
 def format_spread_value(spread: float | None) -> str:
     if spread is None:
         return "N/A"
@@ -222,8 +214,18 @@ def format_spread_value(spread: float | None) -> str:
         spread_display = f"{round(spread_cents):.0f}¢"
     else:
         spread_display = f"{spread_cents:.1f}¢"
-    status = format_spread_status(spread_cents)
-    return f"{spread_display} ({status})"
+    return spread_display
+
+
+def format_spread_advisory(spread: float | None) -> str:
+    if spread is None:
+        return "ℹ️ Spread data is unavailable right now."
+    spread_cents = spread * 100
+    if spread_cents < 2:
+        return "✅ Active market: market orders should have minimal slippage or spread cost."
+    if spread_cents < 3:
+        return "⚠️ Medium spread: you may lose a bit when opening positions with market orders."
+    return "⚠️ Wide spread: be careful — market orders can be costly."
 
 
 def build_main_keyboard() -> ReplyKeyboardMarkup:
@@ -946,10 +948,10 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     market = get_market(market_alias)
 
     spread_yes = get_orderbook_spread(market['tokens']['yes'])[2]
-    spread_block = f"📏 *Order book spread*: {format_spread_value(spread_yes)}\n"
-    if spread_yes is not None and (spread_yes * 100) > 4:
-        spread_block += "⚠️ Wide spread — market order may be expensive.\n"
-    spread_block += "\n"
+    spread_block = (
+        f"📏 *Order book spread*: {format_spread_value(spread_yes)}\n"
+        f"{format_spread_advisory(spread_yes)}\n\n"
+    )
 
     await update.message.reply_text(
         f"{market['emoji']} *{market['title']}*\n\n"
