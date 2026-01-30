@@ -183,16 +183,14 @@ def get_orderbook_spread(token_id: str) -> tuple[float | None, float | None, flo
         resp.raise_for_status()
         book = resp.json() if resp.content else {}
 
-        best_bid = None
-        best_ask = None
-
         bids = book.get("bids") or []
         asks = book.get("asks") or []
 
-        if bids:
-            best_bid = float(bids[0].get("price", 0))
-        if asks:
-            best_ask = float(asks[0].get("price", 0))
+        bid_prices = [float(b.get("price", 0)) for b in bids if b.get("price") is not None]
+        ask_prices = [float(a.get("price", 0)) for a in asks if a.get("price") is not None]
+
+        best_bid = max(bid_prices) if bid_prices else None
+        best_ask = min(ask_prices) if ask_prices else None
 
         # Normalize if API returns cents (e.g., 12 instead of 0.12)
         max_price = max(p for p in [best_bid, best_ask] if p is not None)
