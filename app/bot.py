@@ -240,6 +240,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
         [KeyboardButton("🎨 Abstract Token"), KeyboardButton("🧬 Extended Token")],
+        [KeyboardButton("🧠 Opinion Token"), KeyboardButton("🌊 OpenSea Token")],
         [KeyboardButton("🧪 Opinion FDV"), KeyboardButton("💎 Opensea FDV")],
         [KeyboardButton("🔙 Back to Trading")],
     ]
@@ -849,6 +850,10 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Will Abstract launch a token by December 31, 2026?\n\n"
         "🧬 *Extended Token by March 31, 2026*\n"
         "Will Extended launch a token by March 31, 2026?\n\n"
+        "🧠 *Opinion Token by February 17, 2026*\n"
+        "Will Opinion launch a token by February 17, 2026?\n\n"
+        "🌊 *OpenSea Token by March 31, 2026*\n"
+        "Will OpenSea launch a token by March 31, 2026?\n\n"
         "🧪 *Opinion FDV above $1B one day after launch?*\n"
         "Will FDV be above $1B one day after launch?\n\n"
         "💎 *Opensea FDV above $1B one day after launch?*\n"
@@ -1292,6 +1297,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == "🧬 Extended Token":
         return await market_trade_menu(update, context, "extended")
+
+    if text == "🧠 Opinion Token":
+        return await market_trade_menu(update, context, "opinion")
+
+    if text == "🌊 OpenSea Token":
+        return await market_trade_menu(update, context, "opensea")
 
     if text == "🧪 Opinion FDV":
         return await market_trade_menu(update, context, "opinion_fdv")

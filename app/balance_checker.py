@@ -35,6 +35,14 @@ MARKET_TOKENS = {
         "yes": "80202018619101908013933944100239367385491528832020028327612486898619283802751",
         "no": "33249883623946882498042187494418816609278977641116912274628462290026666786835"
     },
+    "opinion": {
+        "yes": "93726420352633513329470759167746705807552087459747684830196318055992489326724",
+        "no": "77149450096247036266517002616170405423637634097737272142741091924214387425694"
+    },
+    "opensea": {
+        "yes": "27454650606007592941369542547867915436927994811369993520265431958254270690528",
+        "no": "86113972936256916379383585127599563414935698637842191661881945451738552931124"
+    },
     "opinion_fdv": {
         "yes": "50352926775492572007129313229442771572343916931005903007424590093174311630298",
         "no": "24347171758774499938462633574721292772800062019156311729242237473590058137270"
@@ -172,6 +180,8 @@ class BalanceChecker:
             'base': {'yes': 0.0, 'no': 0.0},
             'abstract': {'yes': 0.0, 'no': 0.0},
             'extended': {'yes': 0.0, 'no': 0.0},
+            'opinion': {'yes': 0.0, 'no': 0.0},
+            'opensea': {'yes': 0.0, 'no': 0.0},
             'opinion_fdv': {'yes': 0.0, 'no': 0.0},
             'opensea_fdv': {'yes': 0.0, 'no': 0.0}
         }
@@ -219,6 +229,28 @@ class BalanceChecker:
                 positions['extended']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['extended']['no']
+                )
+
+            # Opinion token positions
+            if MARKET_TOKENS['opinion']['yes'] != 'TBD':
+                positions['opinion']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opinion']['yes']
+                )
+                positions['opinion']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opinion']['no']
+                )
+
+            # OpenSea token positions
+            if MARKET_TOKENS['opensea']['yes'] != 'TBD':
+                positions['opensea']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opensea']['yes']
+                )
+                positions['opensea']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['opensea']['no']
                 )
 
             # Opinion FDV positions
@@ -355,6 +387,52 @@ def format_balance_message(balance: Dict) -> str:
         if extended_no > 0:
             shares = extended_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['extended']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # Opinion Token
+    opinion_yes = positions['opinion']['yes']
+    opinion_no = positions['opinion']['no']
+    if opinion_yes > 0 or opinion_no > 0:
+        has_positions = True
+        lines.append("  Opinion Token:")
+        if opinion_yes > 0:
+            shares = opinion_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opinion']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if opinion_no > 0:
+            shares = opinion_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opinion']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # OpenSea Token
+    opensea_yes = positions['opensea']['yes']
+    opensea_no = positions['opensea']['no']
+    if opensea_yes > 0 or opensea_no > 0:
+        has_positions = True
+        lines.append("  OpenSea Token:")
+        if opensea_yes > 0:
+            shares = opensea_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opensea']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if opensea_no > 0:
+            shares = opensea_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['opensea']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
