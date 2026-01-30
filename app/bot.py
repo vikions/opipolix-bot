@@ -1,4 +1,5 @@
 import os
+import requests
 from telegram import (
     Update,
     ReplyKeyboardMarkup,
@@ -169,6 +170,52 @@ def format_tx_hash(tx_hash):
             return f"`{tx_str[:16]}...`"
         return f"`{tx_str}`"
     return "`—`"
+
+
+def get_orderbook_spread(token_id: str) -> tuple[float | None, float | None, float | None]:
+    """Return best bid/ask spread for a token from Polymarket CLOB."""
+    try:
+        resp = requests.get(
+            "https://clob.polymarket.com/book",
+            params={"token_id": token_id},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        book = resp.json() if resp.content else {}
+
+        best_bid = None
+        best_ask = None
+
+        bids = book.get("bids") or []
+        asks = book.get("asks") or []
+
+        if bids:
+            best_bid = float(bids[0].get("price", 0))
+        if asks:
+            best_ask = float(asks[0].get("price", 0))
+
+        if best_bid is None or best_ask is None:
+            return best_bid, best_ask, None
+
+        return best_bid, best_ask, max(best_ask - best_bid, 0.0)
+    except Exception:
+        return None, None, None
+
+
+def format_spread_status(spread_cents: float) -> str:
+    if spread_cents < 2:
+        return "good"
+    if spread_cents <= 4:
+        return "ok"
+    return "bad"
+
+
+def format_spread_line(label: str, spread: float | None) -> str:
+    if spread is None:
+        return f"{label}: N/A"
+    spread_cents = spread * 100
+    status = format_spread_status(spread_cents)
+    return f"{label}: {spread_cents:.1f}c ({status})"
 
 
 def build_main_keyboard() -> ReplyKeyboardMarkup:
@@ -889,14 +936,30 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         return
     
     market = get_market(market_alias)
-    
-    
+
+    spread_yes = get_orderbook_spread(market['tokens']['yes'])[2]
+    spread_no = get_orderbook_spread(market['tokens']['no'])[2]
+
+    spread_lines = [
+        "📏 *Order book spread*",
+        format_spread_line("YES", spread_yes),
+        format_spread_line("NO", spread_no),
+    ]
+    if any(
+        spread is not None and (spread * 100) > 4
+        for spread in (spread_yes, spread_no)
+    ):
+        spread_lines.append("⚠️ Wide spread — market order may be expensive.")
+
+    spread_block = "\n".join(spread_lines) + "\n\n"
+
     await update.message.reply_text(
         f"{market['emoji']} *{market['title']}*\n\n"
         f"📊 Choose your action:\n\n"
         f"📈 *Buy YES* - Buy shares that it will happen\n"
         f"📉 *Buy NO* - Buy shares that it won't happen\n"
         f"📊 *Sell* - Sell your existing shares\n\n"
+        f"{spread_block}"
         f"💡 Trades are executed at market price\n"
         f"⚡ All transactions are gasless!",
         parse_mode="Markdown",
