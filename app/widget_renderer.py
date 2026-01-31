@@ -5,17 +5,25 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 
-MAX_ALIAS_LEN = 4
+MAX_ALIAS_LEN = 5
 MAX_LINE_LEN = 32
 
 KNOWN_ALIAS_BY_ALIAS = {
-    "opensea": "OpS",
+    "opensea": "OpenS",
     "opinion": "Opin",
+    "metamask": "MetaM",
+    "base": "Base",
+    "abstract": "Abst",
+    "polymarket": "PolyM",
 }
 
 KNOWN_ALIAS_BY_TITLE = {
-    "opensea token by march 31, 2026": "OpS",
+    "opensea token by march 31, 2026": "OpenS",
     "opinion token by february 17, 2026": "Opin",
+    "metamask token by june 30": "MetaM",
+    "base token by june 30, 2026": "Base",
+    "abstract token by dec 31, 2026": "Abst",
+    "polymarket token by march 31, 2026": "PolyM",
 }
 
 
@@ -67,9 +75,17 @@ def _known_alias(snapshot: Dict[str, object]) -> Optional[str]:
         if normalized in KNOWN_ALIAS_BY_TITLE:
             return KNOWN_ALIAS_BY_TITLE[normalized]
         if "opensea token" in normalized:
-            return "OpS"
+            return "OpenS"
         if "opinion token" in normalized:
             return "Opin"
+        if "metamask token" in normalized:
+            return "MetaM"
+        if normalized.startswith("base token"):
+            return "Base"
+        if "abstract token" in normalized:
+            return "Abst"
+        if "polymarket token" in normalized:
+            return "PolyM"
     return None
 
 
@@ -167,7 +183,7 @@ def _verbose_lines(snapshots: List[Dict[str, object]]) -> List[str]:
 def render_widget_text(
     snapshots: List[Dict[str, object]], updated_at: datetime, compact_mode: bool = True
 ) -> str:
-    lines = ["OpiPolix Widget"]
+    lines: List[str] = []
 
     if compact_mode:
         lines.extend(_compact_lines(snapshots))
@@ -186,7 +202,7 @@ def compute_render_hash(text: str) -> str:
 def compute_market_hash(
     snapshots: List[Dict[str, object]], compact_mode: bool = True
 ) -> str:
-    lines = ["OpiPolix Widget"]
+    lines: List[str] = []
     if compact_mode:
         lines.extend(_compact_lines(snapshots))
     else:

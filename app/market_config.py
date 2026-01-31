@@ -130,6 +130,22 @@ MARKETS = {
         "polymarket_id": 618455,
         "slug": "opensea-fdv-above-1b-one-day-after-launch"
     }
+    ,
+    "polymarket": {
+        "title": "Polymarket Token by March 31, 2026",
+        "condition_id": "TBD",
+        "question_id": "TBD",
+        "tokens": {
+            "yes": "TBD",
+            "no": "TBD"
+        },
+        "clob_token_ids": {
+            "yes": "TBD",
+            "no": "TBD"
+        },
+        "emoji": "PM",
+        "opinion_id": 1797
+    }
 }
 
 

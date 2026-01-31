@@ -38,7 +38,11 @@ db = WidgetDatabase()
 ALL_MARKETS = get_all_markets()
 ALL_MARKET_ALIASES = list(ALL_MARKETS.keys())
 
-POPULAR_MARKETS = [alias for alias in ["opinion", "opensea", "metamask", "base", "abstract"] if alias in ALL_MARKETS]
+POPULAR_MARKETS = [
+    alias
+    for alias in ["opinion", "opensea", "metamask", "base", "abstract", "polymarket"]
+    if alias in ALL_MARKETS
+]
 RECENT_MARKETS = [alias for alias in ALL_MARKET_ALIASES[-5:] if alias in ALL_MARKETS]
 
 
@@ -84,6 +88,14 @@ def build_widget_menu_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("ℹ️ Permissions / How-to", callback_data=CB_WIDGET_PERMS)],
     ]
     return InlineKeyboardMarkup(rows)
+
+def _widget_menu_text() -> str:
+    return (
+        "📌 Telegram Widget\n\n"
+        "Create a pinned board message in your group/channel that shows live YES/NO "
+        "values for selected markets. The bot edits the same message on schedule "
+        "(no spam)."
+    )
 
 
 def build_permissions_keyboard() -> InlineKeyboardMarkup:
@@ -205,7 +217,7 @@ async def widget_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         try:
             await context.bot.send_message(
                 chat_id=update.effective_user.id,
-                text=BTN_WIDGET_MENU,
+                text=_widget_menu_text(),
                 reply_markup=build_widget_menu_keyboard(),
             )
             await message.reply_text("I’ve sent you a DM with the widget menu.")
@@ -214,7 +226,7 @@ async def widget_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     context.user_data.pop("widget_pending", None)
-    await message.reply_text(BTN_WIDGET_MENU, reply_markup=build_widget_menu_keyboard())
+    await message.reply_text(_widget_menu_text(), reply_markup=build_widget_menu_keyboard())
 
 
 async def _send_permissions_instructions(chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> None:

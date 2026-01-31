@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from market_config import get_market
+from opinion_tracked_markets import fetch_market as fetch_opinion_market
 from polymarket_client import get_polymarket_binary_prices
 from polymarket_tracked_markets import fetch_market
 
@@ -13,12 +14,19 @@ async def get_market_snapshot(alias: str) -> Optional[Dict[str, object]]:
         return None
 
     market_id = market.get("polymarket_id")
+    opinion_id = market.get("opinion_id")
     title = market.get("title") or alias
     yes_value = None
     no_value = None
 
     if market_id:
         data = await fetch_market(market_id)
+        if data:
+            title = data.get("title") or title
+            yes_value = data.get("yes_price")
+            no_value = data.get("no_price")
+    elif opinion_id:
+        data = await fetch_opinion_market(opinion_id)
         if data:
             title = data.get("title") or title
             yes_value = data.get("yes_price")

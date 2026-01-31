@@ -16,10 +16,9 @@ class WidgetRendererTest(unittest.TestCase):
         text = render_widget_text(snapshots, datetime(2026, 1, 31, 8, 14))
         lines = text.split("\n")
 
-        self.assertEqual(lines[0], "OpiPolix Widget")
-        self.assertIn("OpS", text)
+        self.assertIn("OpenS", text)
         self.assertIn("Opin", text)
-        self.assertIn("UTC 08:14", text)
+        self.assertEqual(lines[-1], "UTC 08:14")
         self.assertNotIn("🟢", text)
         self.assertNotIn("Updated", text)
 
