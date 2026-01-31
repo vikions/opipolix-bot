@@ -1,10 +1,30 @@
-from datetime import datetime
-from typing import Dict, Optional
+﻿from datetime import datetime
+from typing import Dict
 
 from telegram.error import BadRequest, Forbidden, RetryAfter, TelegramError
 
 from widget_markets import get_market_snapshots
-from widget_renderer import compute_render_hash, render_widget_text
+from widget_renderer import compute_market_hash, render_widget_text
+
+
+HEARTBEAT_SECONDS = 600
+
+
+def decide_widget_update(
+    now: datetime,
+    last_render_hash: str | None,
+    last_heartbeat_at: datetime | None,
+    market_hash: str,
+    heartbeat_seconds: int = HEARTBEAT_SECONDS,
+) -> str:
+    if market_hash != last_render_hash:
+        return "data_changed"
+    if not last_heartbeat_at:
+        return "heartbeat"
+    elapsed = (now - last_heartbeat_at).total_seconds()
+    if elapsed >= heartbeat_seconds:
+        return "heartbeat"
+    return "skip"
 
 
 async def update_widget_message(bot, widget: Dict[str, object], db, force: bool = False) -> Dict[str, object]:
@@ -15,22 +35,34 @@ async def update_widget_message(bot, widget: Dict[str, object], db, force: bool 
     if not force and last_rendered_at:
         delta = (now - last_rendered_at).total_seconds()
         if delta < interval_seconds:
-            return {"status": "skipped", "reason": "throttled", "retry_in": interval_seconds - delta}
+            return {
+                "status": "skipped",
+                "reason": "throttled",
+                "retry_in": interval_seconds - delta,
+            }
 
     selected = widget.get("selected_market_ids") or []
     snapshots = await get_market_snapshots(selected)
     if not snapshots:
         return {"status": "skipped", "reason": "no_data"}
 
-    compare_time = last_rendered_at or now
-    compare_text = render_widget_text(snapshots, compare_time)
-    compare_hash = compute_render_hash(compare_text)
+    compact_mode = bool(widget.get("compact_mode", True))
+    market_hash = compute_market_hash(snapshots, compact_mode=compact_mode)
 
-    if not force and widget.get("last_render_hash") == compare_hash:
+    decision = decide_widget_update(
+        now=now,
+        last_render_hash=widget.get("last_render_hash"),
+        last_heartbeat_at=widget.get("last_heartbeat_at"),
+        market_hash=market_hash,
+    )
+
+    if force:
+        decision = "force"
+
+    if decision == "skip":
         return {"status": "skipped", "reason": "unchanged"}
 
-    render_text = render_widget_text(snapshots, now)
-    render_hash = compute_render_hash(render_text)
+    render_text = render_widget_text(snapshots, now, compact_mode=compact_mode)
 
     try:
         await bot.edit_message_text(
@@ -47,5 +79,10 @@ async def update_widget_message(bot, widget: Dict[str, object], db, force: bool 
     except TelegramError as exc:
         return {"status": "error", "error": str(exc)}
 
-    db.update_render_state(int(widget.get("widget_id")), render_hash, now)
-    return {"status": "updated", "render_text": render_text}
+    db.update_render_state(
+        int(widget.get("widget_id")),
+        market_hash,
+        now,
+        heartbeat_at=now,
+    )
+    return {"status": "updated", "render_text": render_text, "reason": decision}

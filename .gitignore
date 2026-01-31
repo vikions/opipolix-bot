@@ -40,3 +40,7 @@ package-lock.json
 # Test files
 test_*.py
 *_test.py
+
+# Allow repository tests
+!tests/
+!tests/*.py

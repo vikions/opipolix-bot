@@ -36,8 +36,10 @@ class WidgetDatabase:
                     selected_market_ids TEXT NOT NULL,
                     interval_seconds INTEGER NOT NULL,
                     enabled BOOLEAN DEFAULT TRUE,
+                    compact_mode BOOLEAN DEFAULT TRUE,
                     last_render_hash TEXT,
                     last_rendered_at TIMESTAMP,
+                    last_heartbeat_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -65,16 +67,49 @@ class WidgetDatabase:
                     selected_market_ids TEXT NOT NULL,
                     interval_seconds INTEGER NOT NULL,
                     enabled INTEGER DEFAULT 1,
+                    compact_mode INTEGER DEFAULT 1,
                     last_render_hash TEXT,
                     last_rendered_at TIMESTAMP,
+                    last_heartbeat_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
 
+        self._ensure_widget_columns(cursor)
         conn.commit()
         conn.close()
+
+    def _ensure_widget_columns(self, cursor) -> None:
+        if self.db.use_postgres:
+            cursor.execute(
+                "ALTER TABLE telegram_widgets "
+                "ADD COLUMN IF NOT EXISTS compact_mode BOOLEAN DEFAULT TRUE"
+            )
+            cursor.execute(
+                "ALTER TABLE telegram_widgets "
+                "ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMP"
+            )
+            return
+
+        cursor.execute("PRAGMA table_info(telegram_widgets)")
+        rows = cursor.fetchall() or []
+        existing = set()
+        for row in rows:
+            if isinstance(row, dict):
+                existing.add(row.get("name"))
+            else:
+                existing.add(row[1] if len(row) > 1 else None)
+
+        if "compact_mode" not in existing:
+            cursor.execute(
+                "ALTER TABLE telegram_widgets ADD COLUMN compact_mode INTEGER DEFAULT 1"
+            )
+        if "last_heartbeat_at" not in existing:
+            cursor.execute(
+                "ALTER TABLE telegram_widgets ADD COLUMN last_heartbeat_at TIMESTAMP"
+            )
 
     def _serialize_market_ids(self, market_ids: List[str]) -> str:
         return json.dumps(market_ids or [])
@@ -185,11 +220,14 @@ class WidgetDatabase:
         selected_market_ids: List[str],
         interval_seconds: int,
         enabled: bool = True,
+        compact_mode: bool = True,
         last_render_hash: Optional[str] = None,
         last_rendered_at: Optional[datetime] = None,
+        last_heartbeat_at: Optional[datetime] = None,
     ) -> int:
         market_ids_json = self._serialize_market_ids(selected_market_ids)
         rendered_at = last_rendered_at.isoformat() if last_rendered_at else None
+        heartbeat_at = last_heartbeat_at.isoformat() if last_heartbeat_at else None
 
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -199,8 +237,9 @@ class WidgetDatabase:
                 """
                 INSERT INTO telegram_widgets
                 (owner_user_id, target_chat_id, board_message_id, selected_market_ids,
-                 interval_seconds, enabled, last_render_hash, last_rendered_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                 interval_seconds, enabled, compact_mode, last_render_hash,
+                 last_rendered_at, last_heartbeat_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING widget_id
                 """,
                 (
@@ -210,8 +249,10 @@ class WidgetDatabase:
                     market_ids_json,
                     interval_seconds,
                     enabled,
+                    compact_mode,
                     last_render_hash,
                     rendered_at,
+                    heartbeat_at,
                 ),
             )
             widget_id = cursor.fetchone()[0]
@@ -220,8 +261,9 @@ class WidgetDatabase:
                 """
                 INSERT INTO telegram_widgets
                 (owner_user_id, target_chat_id, board_message_id, selected_market_ids,
-                 interval_seconds, enabled, last_render_hash, last_rendered_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 interval_seconds, enabled, compact_mode, last_render_hash,
+                 last_rendered_at, last_heartbeat_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     owner_user_id,
@@ -230,8 +272,10 @@ class WidgetDatabase:
                     market_ids_json,
                     interval_seconds,
                     int(enabled),
+                    int(compact_mode),
                     last_render_hash,
                     rendered_at,
+                    heartbeat_at,
                 ),
             )
             widget_id = cursor.lastrowid
@@ -248,8 +292,13 @@ class WidgetDatabase:
             widget.get("selected_market_ids")
         )
         widget["enabled"] = self._coerce_bool(widget.get("enabled"))
+        compact_value = widget.get("compact_mode")
+        widget["compact_mode"] = True if compact_value is None else self._coerce_bool(compact_value)
         widget["interval_seconds"] = int(widget.get("interval_seconds") or 0)
         widget["last_rendered_at"] = self._parse_timestamp(widget.get("last_rendered_at"))
+        widget["last_heartbeat_at"] = self._parse_timestamp(
+            widget.get("last_heartbeat_at")
+        )
         return widget
 
     def get_widget_by_id(self, widget_id: int) -> Optional[Dict[str, Any]]:
@@ -447,6 +496,34 @@ class WidgetDatabase:
         conn.commit()
         conn.close()
 
+    def set_widget_compact_mode(self, widget_id: int, compact_mode: bool) -> None:
+        conn = self.db.get_connection()
+        cursor = conn.cursor()
+
+        if self.db.use_postgres:
+            cursor.execute(
+                """
+                UPDATE telegram_widgets
+                SET compact_mode = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE widget_id = %s
+                """,
+                (compact_mode, widget_id),
+            )
+        else:
+            cursor.execute(
+                """
+                UPDATE telegram_widgets
+                SET compact_mode = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE widget_id = ?
+                """,
+                (int(compact_mode), widget_id),
+            )
+
+        conn.commit()
+        conn.close()
+
     def mark_widget_dirty(self, widget_id: int) -> None:
         conn = self.db.get_connection()
         cursor = conn.cursor()
@@ -457,6 +534,7 @@ class WidgetDatabase:
                 UPDATE telegram_widgets
                 SET last_render_hash = NULL,
                     last_rendered_at = NULL,
+                    last_heartbeat_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE widget_id = %s
                 """,
@@ -468,6 +546,7 @@ class WidgetDatabase:
                 UPDATE telegram_widgets
                 SET last_render_hash = NULL,
                     last_rendered_at = NULL,
+                    last_heartbeat_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE widget_id = ?
                 """,
@@ -478,9 +557,14 @@ class WidgetDatabase:
         conn.close()
 
     def update_render_state(
-        self, widget_id: int, render_hash: str, rendered_at: datetime
+        self,
+        widget_id: int,
+        render_hash: str,
+        rendered_at: datetime,
+        heartbeat_at: Optional[datetime] = None,
     ) -> None:
         rendered_at_value = rendered_at.isoformat() if rendered_at else None
+        heartbeat_value = heartbeat_at.isoformat() if heartbeat_at else None
         conn = self.db.get_connection()
         cursor = conn.cursor()
 
@@ -490,10 +574,11 @@ class WidgetDatabase:
                 UPDATE telegram_widgets
                 SET last_render_hash = %s,
                     last_rendered_at = %s,
+                    last_heartbeat_at = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE widget_id = %s
                 """,
-                (render_hash, rendered_at_value, widget_id),
+                (render_hash, rendered_at_value, heartbeat_value, widget_id),
             )
         else:
             cursor.execute(
@@ -501,10 +586,11 @@ class WidgetDatabase:
                 UPDATE telegram_widgets
                 SET last_render_hash = ?,
                     last_rendered_at = ?,
+                    last_heartbeat_at = ?,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE widget_id = ?
                 """,
-                (render_hash, rendered_at_value, widget_id),
+                (render_hash, rendered_at_value, heartbeat_value, widget_id),
             )
 
         conn.commit()

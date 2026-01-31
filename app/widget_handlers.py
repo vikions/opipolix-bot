@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 from market_config import get_all_markets
 from widget_db import WidgetDatabase
 from widget_markets import get_market_snapshots
-from widget_renderer import compute_render_hash, render_widget_text
+from widget_renderer import compute_market_hash, render_widget_text
 from widget_updater import update_widget_message
 
 
@@ -165,11 +165,14 @@ def build_widget_actions_keyboard(widget: Dict[str, object]) -> InlineKeyboardMa
     enabled = bool(widget.get("enabled"))
     toggle_label = "⏸ Pause" if enabled else "▶️ Resume"
     toggle_action = "pause" if enabled else "resume"
+    compact_mode = bool(widget.get("compact_mode", True))
+    compact_label = "Compact view: ON" if compact_mode else "Compact view: OFF"
 
     rows = [
         [InlineKeyboardButton(toggle_label, callback_data=f"{CB_WIDGET_ACTION_PREFIX}{toggle_action}:{widget_id}")],
         [InlineKeyboardButton("🛠 Edit markets", callback_data=f"{CB_WIDGET_ACTION_PREFIX}edit_markets:{widget_id}")],
         [InlineKeyboardButton("⏱ Change interval", callback_data=f"{CB_WIDGET_ACTION_PREFIX}edit_interval:{widget_id}")],
+        [InlineKeyboardButton(compact_label, callback_data=f"{CB_WIDGET_ACTION_PREFIX}toggle_compact:{widget_id}")],
         [InlineKeyboardButton("🔄 Refresh now", callback_data=f"{CB_WIDGET_ACTION_PREFIX}refresh:{widget_id}")],
         [InlineKeyboardButton("🗑 Delete", callback_data=f"{CB_WIDGET_ACTION_PREFIX}delete:{widget_id}")],
         [InlineKeyboardButton("⬅️ Back", callback_data=CB_WIDGET_MANAGE)],
@@ -437,8 +440,8 @@ async def _create_widget(
         return False
 
     now = datetime.utcnow()
-    render_text = render_widget_text(snapshots, now)
-    render_hash = compute_render_hash(render_text)
+    render_text = render_widget_text(snapshots, now, compact_mode=True)
+    render_hash = compute_market_hash(snapshots, compact_mode=True)
 
     try:
         message = await context.bot.send_message(
@@ -474,8 +477,10 @@ async def _create_widget(
         selected_market_ids=selected_markets,
         interval_seconds=interval_seconds,
         enabled=True,
+        compact_mode=True,
         last_render_hash=render_hash,
         last_rendered_at=now,
+        last_heartbeat_at=now,
     )
 
     await _send_widget_created(context, owner_id, chat_title)
@@ -742,13 +747,15 @@ async def handle_widget_callback(update: Update, context: ContextTypes.DEFAULT_T
         markets_count = len(widget.get("selected_market_ids") or [])
         interval_label = _format_interval(int(widget.get("interval_seconds") or 0))
         status = "Enabled" if widget.get("enabled") else "Paused"
+        compact_status = "ON" if widget.get("compact_mode", True) else "OFF"
 
         text = (
             f"Widget #{widget_id}\n"
             f"Chat: {chat_title}\n"
             f"Markets: {markets_count}\n"
             f"Interval: {interval_label}\n"
-            f"Status: {status}"
+            f"Status: {status}\n"
+            f"Compact view: {compact_status}"
         )
         await query.edit_message_text(text, reply_markup=build_widget_actions_keyboard(widget))
         return
@@ -819,6 +826,18 @@ async def handle_widget_callback(update: Update, context: ContextTypes.DEFAULT_T
                 reply_markup=build_interval_keyboard(
                     int(pending["interval_seconds"]), "✅ Save interval"
                 ),
+            )
+            return
+
+        if action == "toggle_compact":
+            compact_mode = not bool(widget.get("compact_mode", True))
+            db.set_widget_compact_mode(widget_id, compact_mode)
+            db.mark_widget_dirty(widget_id)
+            updated = {**widget, "compact_mode": compact_mode}
+            status_label = "ON" if compact_mode else "OFF"
+            await query.edit_message_text(
+                f"✅ Compact view set to {status_label}.",
+                reply_markup=build_widget_actions_keyboard(updated),
             )
             return
 
