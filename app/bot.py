@@ -61,6 +61,14 @@ from tge_alert_handlers import (
     handle_pending_tge_alert_input,
     show_tge_alerts_menu,
 )
+from widget_handlers import (
+    handle_pending_widget_input,
+    handle_widget_callback,
+    record_chat_from_update,
+    widget_menu,
+    widget_pause_command,
+    widget_resume_command,
+)
 from cancel_order_handler import cancel_auto_order
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
@@ -81,6 +89,7 @@ HELP_TEXT = (
     "/about – info about this bot\n"
     "/o_markets – show active Opinion markets\n"
     "/p_markets – show active Polymarket markets\n"
+    "/widget – open Telegram Widget menu\n"
     "/spread <alias> – spread check (metamask / base)\n"
     "/wallet – show your trading wallet\n"
     "/balance – check your balance\n"
@@ -139,6 +148,7 @@ COMMON_MARKETS = [
 
 BTN_SPREAD_TGE = "✨ Spread TGE Tokens ✨"
 BTN_TGE_ALERTS = TGE_ALERTS_MENU_TEXT
+BTN_WIDGET = "📌 Telegram Widget"
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
@@ -232,6 +242,7 @@ def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(BTN_SPREAD_TGE)],
         [KeyboardButton(BTN_TGE_ALERTS)],
+        [KeyboardButton(BTN_WIDGET)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
         [KeyboardButton(BTN_TRACKER), KeyboardButton(BTN_TRADING)],
         [KeyboardButton(BTN_ABOUT)],
@@ -1145,13 +1156,25 @@ async def show_market_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик кнопок"""
-    text = update.message.text.strip()
+    message = update.effective_message
+    if not message or not message.text:
+        return
+    text = message.text.strip()
+
+    record_chat_from_update(update)
+    if update.effective_chat and update.effective_chat.type != "private":
+        return
+
+
     
     
     if text.startswith('/'):
         return
     
     
+    if await handle_pending_widget_input(update, context, text):
+        return
+
     if await handle_pending_auto_trade_input(update, context, text):
         return
     
@@ -1178,6 +1201,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             pass
     
     
+    if text == BTN_WIDGET:
+        return await widget_menu(update, context)
+
     if text == BTN_SPREAD_TGE:
         await update.message.reply_text(
             "Select a market to see the spread between Opinion and Polymarket.",
@@ -1857,6 +1883,10 @@ def main():
     app.add_handler(CommandHandler("cancel", cancel_auto_order))
     app.add_handler(CommandHandler("cancelalert", cancel_opinion_alert))
     app.add_handler(CommandHandler("worker_status", worker_status))
+    app.add_handler(CommandHandler("widget", widget_menu))
+    app.add_handler(CommandHandler("widget_pause", widget_pause_command))
+    app.add_handler(CommandHandler("widget_resume", widget_resume_command))
+    app.add_handler(CallbackQueryHandler(handle_widget_callback, pattern="^widget"))
 
     app.add_handler(
         CallbackQueryHandler(

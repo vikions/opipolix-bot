@@ -68,6 +68,11 @@ Set automated triggers and let the bot trade for you:
 - **Market info** - See current YES/NO pricing
 - **Active orders** - View and manage your auto-trade triggers
 
+### Telegram Widget (Pinned Board)
+- **Pinned board message** in your group/channel (no spam)
+- **Select 1-5 markets** and auto-update YES/NO values
+- **Needs only Pin messages + Edit messages** permissions
+
 ### 💸 Withdrawals
 - **Easy USDC withdrawal** - One command to any address
 - **Gasless transactions** - No fees for withdrawals
@@ -109,6 +114,9 @@ python app/bot.py
 
 # Run auto-trade worker (in separate terminal)
 python app/auto_trade_worker.py
+
+# Run widget worker (in separate terminal)
+python app/widget_worker.py
 ```
 
 ---
@@ -177,6 +185,15 @@ opipolix-bot/
 4. ✅ Transaction confirmed (gasless!)
 ```
 
+### Telegram Widget (Pinned Board)
+```
+1. Open bot → 📌 Telegram Widget → Create widget
+2. Add @OpiPolixBot to your group/channel as admin
+3. Grant ONLY: Pin messages + Edit messages
+4. Select chat, markets, and update interval
+5. ✅ Widget is posted and pinned
+```
+
 ### Auto-Trade Setup
 ```
 1. Open bot → Markets → MetaMask Token → Auto-Trade
@@ -217,6 +234,11 @@ opipolix-bot/
 - Executes trades automatically
 - Sends notifications
 
+**Widget Worker** (`widget_worker.py`)
+- Updates pinned widget boards on schedule
+- Edits existing widget messages (no spam)
+- Skips edits when values do not change
+
 ### Key Technologies
 
 - **Telegram Bot API** - User interface
@@ -255,14 +277,17 @@ Railway will automatically:
 
 ### Manual Deployment
 
-Run two processes:
+Run three processes:
 
 ```bash
 # Terminal 1 - Bot
 python app/bot.py
 
-# Terminal 2 - Worker  
+# Terminal 2 - Auto-trade Worker
 python app/auto_trade_worker.py
+
+# Terminal 3 - Widget Worker
+python app/widget_worker.py
 ```
 
 Or use the combined launcher:
