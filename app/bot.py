@@ -308,6 +308,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
         [KeyboardButton("🎨 Abstract Token"), KeyboardButton("🧬 Extended Token")],
+        [KeyboardButton("⚡ MegaETH Airdrop")],
         [KeyboardButton("🧠 Opinion Token"), KeyboardButton("🌊 OpenSea Token")],
         [KeyboardButton("🧪 Opinion FDV"), KeyboardButton("💎 Opensea FDV")],
         [KeyboardButton("🔙 Back to Trading")],
@@ -918,6 +919,8 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Will Abstract launch a token by December 31, 2026?\n\n"
         "🧬 *Extended Token by March 31, 2026*\n"
         "Will Extended launch a token by March 31, 2026?\n\n"
+        "⚡ *MegaETH Airdrop by June 30*\n"
+        "Will MegaETH perform an airdrop by June 30?\n\n"
         "🧠 *Opinion Token by February 17, 2026*\n"
         "Will Opinion launch a token by February 17, 2026?\n\n"
         "🌊 *OpenSea Token by March 31, 2026*\n"
@@ -1386,6 +1389,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == "🧬 Extended Token":
         return await market_trade_menu(update, context, "extended")
+
+    if text == "⚡ MegaETH Airdrop":
+        return await market_trade_menu(update, context, "megaeth")
 
     if text == "🧠 Opinion Token":
         return await market_trade_menu(update, context, "opinion")

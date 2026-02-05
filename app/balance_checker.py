@@ -35,6 +35,10 @@ MARKET_TOKENS = {
         "yes": "80202018619101908013933944100239367385491528832020028327612486898619283802751",
         "no": "33249883623946882498042187494418816609278977641116912274628462290026666786835"
     },
+    "megaeth": {
+        "yes": "96797656031191119176188453471637044475353637081608890153571023284371119486681",
+        "no": "102844052859529992637803443259193395522411387362312885030298797134413940349829"
+    },
     "opinion": {
         "yes": "93726420352633513329470759167746705807552087459747684830196318055992489326724",
         "no": "77149450096247036266517002616170405423637634097737272142741091924214387425694"
@@ -180,6 +184,7 @@ class BalanceChecker:
             'base': {'yes': 0.0, 'no': 0.0},
             'abstract': {'yes': 0.0, 'no': 0.0},
             'extended': {'yes': 0.0, 'no': 0.0},
+            'megaeth': {'yes': 0.0, 'no': 0.0},
             'opinion': {'yes': 0.0, 'no': 0.0},
             'opensea': {'yes': 0.0, 'no': 0.0},
             'opinion_fdv': {'yes': 0.0, 'no': 0.0},
@@ -229,6 +234,17 @@ class BalanceChecker:
                 positions['extended']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['extended']['no']
+                )
+
+            # MegaETH positions
+            if MARKET_TOKENS['megaeth']['yes'] != 'TBD':
+                positions['megaeth']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['megaeth']['yes']
+                )
+                positions['megaeth']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['megaeth']['no']
                 )
 
             # Opinion token positions
@@ -387,6 +403,29 @@ def format_balance_message(balance: Dict) -> str:
         if extended_no > 0:
             shares = extended_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['extended']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # MegaETH
+    megaeth_yes = positions['megaeth']['yes']
+    megaeth_no = positions['megaeth']['no']
+    if megaeth_yes > 0 or megaeth_no > 0:
+        has_positions = True
+        lines.append("  MegaETH:")
+        if megaeth_yes > 0:
+            shares = megaeth_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['megaeth']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if megaeth_no > 0:
+            shares = megaeth_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['megaeth']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")

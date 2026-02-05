@@ -14,7 +14,7 @@ BASE_URL = "https://gamma-api.polymarket.com"
 REQUEST_TIMEOUT_SEC = 10.0
 SEPARATOR_LINE = "------------------------------"
 
-ALIASES_FROM_CONFIG = ["base", "metamask", "abstract", "extended", "opinion", "opensea"]
+ALIASES_FROM_CONFIG = ["base", "metamask", "abstract", "extended", "megaeth", "opinion", "opensea"]
 
 EXTRA_MARKETS = [
     {

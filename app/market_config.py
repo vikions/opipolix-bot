@@ -66,6 +66,22 @@ MARKETS = {
         "polymarket_id": 690612,
         "slug": "will-extended-launch-a-token-by-march-31-2026"
     },
+    "megaeth": {
+        "title": "MegaETH Airdrop by June 30",
+        "condition_id": "0xe459d1b598da754c9fd5fc155b6efe3a144aa80abbc7d041fce7d35d903d3c8e",
+        "question_id": "0xe459d1b598da754c9fd5fc155b6efe3a144aa80abbc7d041fce7d35d903d3c8e",
+        "tokens": {
+            "yes": "96797656031191119176188453471637044475353637081608890153571023284371119486681",
+            "no": "102844052859529992637803443259193395522411387362312885030298797134413940349829"
+        },
+        "clob_token_ids": {
+            "yes": "96797656031191119176188453471637044475353637081608890153571023284371119486681",
+            "no": "102844052859529992637803443259193395522411387362312885030298797134413940349829"
+        },
+        "emoji": "⚡",
+        "polymarket_id": 556108,
+        "slug": "will-megaeth-perform-an-airdrop-by-june-30-143-229-513-574-212-254"
+    },
     "opinion": {
         "title": "Opinion Token by February 17, 2026",
         "condition_id": "0xef77a305d9134cc687c647941f60928695c8eca7117a742aaa4a90494f51b9f6",
