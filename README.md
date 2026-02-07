@@ -13,10 +13,14 @@
 OpiPoliX is a **full-featured Telegram trading bot** for Polymarket prediction markets. Trade crypto token launch markets directly from Telegram with:
 
 - ⚡ **Gasless trading** - No transaction fees
-- 🔐 **Smart Account wallets** - Secure Safe{Core} integration  
-- 🤖 **Auto-Trade triggers** - Set price alerts and auto-execute
-- 📊 **Real-time spreads** - Compare Opinion vs Polymarket pricing
+- 🔐 **Smart Account wallets** - Safe{Core} integration
+- 🤖 **Auto-Trade triggers** - Price alerts + auto-execution
+- 📏 **Order book spread indicator** - Warnings before market orders
+- 📊 **Opinion vs Polymarket spreads** - /spread comparisons
+- 🔔 **Alerts** - Opinion price alerts + TGE alerts
+- 📍 **Opinion tracker** - Track addresses, positions, balances
 - 💰 **Easy withdrawals** - One command to move funds
+
 
 **Live Bot:** [@OpiPoliXBot](https://t.me/OpiPoliXBot)
 
@@ -34,7 +38,7 @@ OpiPoliX is a **full-featured Telegram trading bot** for Polymarket prediction m
 - **Buy/Sell YES or NO** tokens
 - **Percentage-based selling** - Sell 25%, 50%, 75%, or 100% of holdings
 - **Market execution** - Instant fills at best available prices
-- **Transaction history** - Track all your trades
+- **Order book spread warning** - Shown before trading with advisory text
 
 ### 🤖 Auto-Trade (Unique Feature!)
 Set automated triggers and let the bot trade for you:
@@ -46,14 +50,14 @@ Set automated triggers and let the bot trade for you:
    - Example: "Buy $10 YES if price rises +15%"
    - Perfect for: Catching real token launches
 
-2. **🎭 Buy NO on Pump** - Fake news strategy  
+2. **🎭 Buy NO on Pump** - Fake news strategy
    - Automatically buy NO when YES pumps hard
    - Example: "Buy $20 NO if YES pumps +50%"
    - Perfect for: Fading fake news pumps
 
 3. **📉 Buy NO on Dump** - Safety net strategy
    - Automatically buy NO when YES dumps
-   - Example: "Buy $5 NO if YES drops -30%"  
+   - Example: "Buy $5 NO if YES drops -30%"
    - Perfect for: Confirming fake news after dump
 
 **How it works:**
@@ -64,9 +68,21 @@ Set automated triggers and let the bot trade for you:
 - All trades are gasless!
 
 ### 📊 Market Analysis
-- **Real-time spreads** - Compare Opinion vs Polymarket prices
-- **Market info** - See current YES/NO pricing
-- **Active orders** - View and manage your auto-trade triggers
+- **Opinion vs Polymarket spread** - Use /spread for comparisons
+- **Market info** - Current YES/NO pricing for a market
+- **Active orders** - View and manage auto-trade triggers
+
+### 🔔 Alerts
+- **Opinion alerts** - Create, list, and cancel price alerts
+- **TGE alerts** - Discord keyword monitoring for token launches
+
+### 📌 Markets Discovery
+- **/o_markets** - Opinion tracked list
+- **/p_markets** - Polymarket tracked list
+- **Inline show all** - Expand lists from Telegram
+
+### 📍 Opinion Tracker
+- **Track addresses** - Positions and balances for tracked wallets
 
 ### Telegram Widget (Pinned Board)
 - **Pinned board message** in your group/channel (no spam)
@@ -77,6 +93,7 @@ Set automated triggers and let the bot trade for you:
 - **Easy USDC withdrawal** - One command to any address
 - **Gasless transactions** - No fees for withdrawals
 - **Safe and secure** - Transactions signed by your wallet
+
 
 ---
 
@@ -137,17 +154,25 @@ MASTER_KEY=your_32_byte_encryption_key
 
 # Polymarket CLOB API
 BUILDER_API_KEY=your_clob_api_key
-BUILDER_API_SECRET=your_clob_api_secret  
-BUILDER_API_PASSPHRASE=your_clob_passphrase
+BUILDER_SECRET=your_clob_api_secret
+BUILDER_PASS_PHRASE=your_clob_passphrase
 BUILDER_SIGNING_URL=your_signing_service_url
 
-# Blockchain
-POLY_RPC_URL=https://polygon-rpc.com
-RELAYER_URL=https://relayer.polymarket.com
+# Blockchain / Relayer
+POLYGON_RPC=https://polygon-rpc.com
+RELAYER_URL=https://relayer-v2.polymarket.com
 
-# Opinion API (for spread checking)
-OPINION_API_KEY=your_opinion_api_key
-OPINION_API_SECRET=your_opinion_api_secret
+# Opinion API
+API_KEY=your_opinion_api_key
+HOST=https://proxy.opinion.trade:8443
+CHAIN_ID=56
+RPC_URL=https://bsc-dataseed.binance.org
+PRIVATE_KEY=0xyour_private_key
+MULTI_SIG_ADDRESS=0xyour_wallet
+
+# TGE Alerts (Discord)
+DISCORD_TOKEN=your_discord_token
+
 ```
 
 ---
@@ -156,21 +181,27 @@ OPINION_API_SECRET=your_opinion_api_secret
 
 ```
 opipolix-bot/
-├── app/
-│   ├── bot.py                    # Main Telegram bot
-│   ├── auto_trade_worker.py      # Background price monitor
-│   ├── auto_trade_handlers.py    # Auto-trade UI handlers
-│   ├── auto_trade_manager.py     # Order management
-│   ├── price_monitor.py          # Price tracking logic
-│   ├── clob_trading.py           # Trading execution
-│   ├── wallet_manager.py         # Wallet creation & Safe deployment
-│   ├── database.py               # PostgreSQL interface
-│   ├── market_config.py          # Market definitions
-│   └── ...
-├── start.py                      # Production runner (bot + worker)
-├── requirements.txt              # Python dependencies
-├── Procfile                      # Railway deployment config
-└── README.md                     # This file
+??? app/
+?   ??? bot.py                    # Main Telegram bot
+?   ??? auto_trade_worker.py      # Background price monitor
+?   ??? auto_trade_handlers.py    # Auto-trade UI handlers
+?   ??? auto_trade_manager.py     # Order management
+?   ??? price_monitor.py          # Price tracking logic
+?   ??? clob_trading.py           # Trading execution
+?   ??? wallet_manager.py         # Wallet creation & Safe deployment
+?   ??? database.py               # PostgreSQL interface
+?   ??? market_config.py          # Market definitions
+?   ??? opinion_tracked_markets.py
+?   ??? polymarket_tracked_markets.py
+?   ??? opinion_alert_handlers.py
+?   ??? tge_alert_handlers.py
+?   ??? opinion_tracker.py
+?   ??? widget_worker.py          # Pinned widget updates
+?   ??? ...
+??? start.py                      # Production runner (bot + worker)
+??? requirements.txt              # Python dependencies
+??? Procfile                      # Railway deployment config
+??? README.md                     # This file
 ```
 
 ---
@@ -250,14 +281,21 @@ opipolix-bot/
 
 ---
 
-## 🎯 Supported Markets
+## 🎯 Trading Markets (Polymarket CLOB)
 
-Currently tracking high-hype crypto token launch markets:
+Currently enabled for direct trading in the bot:
 
-- 🦊 **MetaMask Token 2025** - Will MetaMask launch a token?
-- 🔵 **Base Token 2025** - Will Base launch a token?
+- 🦊 **MetaMask Token** (June 30)
+- 🔵 **Base Token** (June 30)
+- 🎨 **Abstract Token** (Dec 31, 2026)
+- 🧬 **Extended Token** (March 31, 2026)
+- ⚡ **MegaETH Airdrop** (June 30)
+- 🧠 **Opinion Token** (Feb 17, 2026)
+- 🌊 **OpenSea Token** (March 31, 2026)
+- 🧪 **Opinion FDV** (above $1B one day after launch)
+- 💎 **OpenSea FDV** (above $1B one day after launch)
 
-More markets added regularly based on community interest!
+Additional markets are shown in /p_markets and /o_markets and can be added to trading as needed.
 
 ---
 
@@ -301,11 +339,11 @@ python start.py
 ## 🛣️ Roadmap
 
 - [x] Manual trading (Buy/Sell)
-- [x] Auto-Trade with triggers  
+- [x] Auto-Trade with triggers
 - [x] Gasless Safe wallet deployment
 - [x] Percentage-based selling
 - [x] Real-time balance checking
-- [ ] Add more token launch markets
+- [x] Expanded token launch markets
 - [ ] Trading history & analytics
 - [ ] Multi-market auto-orders
 - [ ] Advanced charting
