@@ -6,7 +6,7 @@ echo "Starting OpiPoliX Bot with auto-restart..."
 run_bot() {
     while true; do
         echo "Starting bot..."
-        python app/bot.py
+        python -m app.bot
         EXIT_CODE=$?
 
         echo "Bot crashed with exit code $EXIT_CODE"
@@ -20,7 +20,7 @@ run_bot() {
 run_auto_trade_worker() {
     while true; do
         echo "Starting auto-trade worker..."
-        python app/auto_trade_worker.py
+        python -m app.auto_trade_worker
         EXIT_CODE=$?
 
         echo "Auto-trade worker crashed with exit code $EXIT_CODE"
@@ -34,7 +34,7 @@ run_auto_trade_worker() {
 run_opinion_alert_worker() {
     while true; do
         echo "Starting opinion alert worker..."
-        python app/opinion_alert_worker.py
+        python -m app.opinion_alert_worker
         EXIT_CODE=$?
 
         echo "Opinion alert worker crashed with exit code $EXIT_CODE"
@@ -48,7 +48,7 @@ run_opinion_alert_worker() {
 run_tge_alert_worker() {
     while true; do
         echo "Starting TGE alert worker..."
-        python app/tge_alert_worker.py
+        python -m app.tge_alert_worker
         EXIT_CODE=$?
 
         echo "TGE alert worker crashed with exit code $EXIT_CODE"
@@ -62,7 +62,7 @@ run_tge_alert_worker() {
 run_widget_worker() {
     while true; do
         echo "Starting widget worker..."
-        python app/widget_worker.py
+        python -m app.widget_worker
         EXIT_CODE=$?
 
         echo "Widget worker crashed with exit code $EXIT_CODE"
