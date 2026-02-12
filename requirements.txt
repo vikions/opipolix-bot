@@ -14,6 +14,21 @@ opinion_clob_sdk
 web3>=7.0.0
 eth-account
 
+# Telegram Bot
+python-telegram-bot==21.4
+
+# TGE Alerts
+discum>=1.4.1
+
+# Environment variables
+python-dotenv
+
+# Opinion trading
+opinion_clob_sdk
+
+web3>=7.0.0
+eth-account
+
 # HTTP requests
 requests
 
@@ -29,3 +44,9 @@ cryptography
 
 # PostgreSQL (for Railway production)
 psycopg2-binary
+
+# Async HTTP
+aiohttp>=3.9.0
+
+# Dome API integration
+dome-api-sdk

@@ -70,6 +70,7 @@ from widget_handlers import (
     widget_resume_command,
 )
 from cancel_order_handler import cancel_auto_order
+from agent_handlers import show_agent_menu_message, handle_agent_input, AGENT_HANDLERS
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
@@ -241,6 +242,7 @@ def format_spread_advisory(spread: float | None) -> str:
 def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(BTN_SPREAD_TGE)],
+        [KeyboardButton("🤖 TGE Agent Mode")],
         [KeyboardButton(BTN_TGE_ALERTS)],
         [KeyboardButton(BTN_WIDGET)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
@@ -1164,6 +1166,11 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     text = message.text.strip()
 
+    # If user is in agent creation flow, route text inputs to agent handlers
+    if context.user_data.get('agent_creation_step'):
+        await handle_agent_input(update, context)
+        return
+
     record_chat_from_update(update)
     if update.effective_chat and update.effective_chat.type != "private":
         return
@@ -1206,6 +1213,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if text == BTN_WIDGET:
         return await widget_menu(update, context)
+
+    if text == "🤖 TGE Agent Mode":
+        return await show_agent_menu_message(update, context)
 
     if text == BTN_SPREAD_TGE:
         await update.message.reply_text(
@@ -1906,6 +1916,18 @@ def main():
             pattern="^polymarket_show_all$",
         )
     )
+    # Agent callbacks dispatcher
+    async def handle_agent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        query = update.callback_query
+        if not query:
+            return
+        data = query.data or ""
+        for pattern, handler in AGENT_HANDLERS.items():
+            if data.startswith(pattern):
+                await handler(update, context)
+                return
+
+    app.add_handler(CallbackQueryHandler(handle_agent_callback, pattern="^agent"))
     
     # Text handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_buttons))
