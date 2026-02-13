@@ -7,6 +7,12 @@ from agent_db import AgentDatabase
 
 agent_db = AgentDatabase()
 
+# Preset Discord channels for one-click agent creation
+PRESET_CHANNELS = {
+    "agent_channel_polymarket": ("1072952844161916938", "Polymarket Discord"),
+    "agent_channel_opinion": ("1263696463553105981", "Opinion Discord"),
+}
+
 
 async def show_agent_menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Open agent menu from a regular message (ReplyKeyboard flow)"""
@@ -287,14 +293,88 @@ async def handle_delete_agent(update: Update, context: ContextTypes.DEFAULT_TYPE
     )
 
 
+async def handle_preset_channel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle Polymarket Discord / Opinion Discord preset channel selection"""
+    query = update.callback_query
+    await query.answer()
+
+    preset = PRESET_CHANNELS.get(query.data)
+    if not preset:
+        await query.edit_message_text("❌ Unknown channel preset.")
+        return
+
+    channel_id, channel_name = preset
+    context.user_data["agent_channel_id"] = channel_id
+    context.user_data["agent_channel_name"] = channel_name
+    context.user_data["agent_creation_step"] = "awaiting_autotrade_choice"
+
+    keyboard = [
+        [InlineKeyboardButton("✅ YES - Auto-trade ON", callback_data="agent_autotrade_yes")],
+        [InlineKeyboardButton("❌ NO - Alerts only", callback_data="agent_autotrade_no")],
+    ]
+
+    await query.edit_message_text(
+        f"📡 Channel: *{channel_name}*\n\n"
+        "*Step 4/4:* Enable automatic trading?\n\n"
+        "✅ YES: Agent will execute trades automatically\n"
+        "❌ NO: Agent will only send alerts",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown",
+    )
+
+
+async def handle_agent_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show recent decision history across user's agents"""
+    query = update.callback_query
+    await query.answer()
+
+    telegram_id = query.from_user.id
+    agents = agent_db.get_user_agents(telegram_id)
+
+    if not agents:
+        await query.edit_message_text(
+            "No agents found. Create an agent first to see decision history.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➕ Create Agent", callback_data="agent_create")],
+                [InlineKeyboardButton("🔙 Back", callback_data="agent_menu")],
+            ]),
+        )
+        return
+
+    text = "📊 *Recent Agent Decisions*\n\n"
+    has_history = False
+
+    for agent in agents:
+        history = agent_db.get_agent_history(agent["id"], limit=3)
+        if not history:
+            continue
+        has_history = True
+        text += f"🤖 *Agent #{agent['id']}* ({agent.get('discord_channel_name') or 'Custom'})\n"
+        for entry in history:
+            action = entry.get("action", "?")
+            conf = entry.get("confidence_score", 0.0)
+            emoji = {"trade": "💸", "trade_executed": "✅", "monitor": "👀", "ignore": "🚫"}.get(action, "❓")
+            text += f"  {emoji} {action} ({conf:.0%}) — {entry.get('created_at', '')}\n"
+        text += "\n"
+
+    if not has_history:
+        text += "No decisions recorded yet. Agents will log decisions when they detect signals.\n"
+
+    keyboard = [[InlineKeyboardButton("🔙 Back", callback_data="agent_menu")]]
+    await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+
 # Mapping for callback dispatch
 AGENT_HANDLERS = {
     "agent_menu": show_agent_menu,
     "agent_create": handle_create_agent,
+    "agent_channel_polymarket": handle_preset_channel,
+    "agent_channel_opinion": handle_preset_channel,
     "agent_channel_custom": handle_custom_channel,
     "agent_autotrade_yes": handle_autotrade_choice,
     "agent_autotrade_no": handle_autotrade_choice,
     "agent_list": handle_list_agents,
+    "agent_history": handle_agent_history,
     "agent_manage_": handle_manage_agent,
     "agent_toggle_": handle_toggle_agent,
     "agent_delete_": handle_delete_agent,
