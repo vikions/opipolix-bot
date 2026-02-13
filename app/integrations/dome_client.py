@@ -32,14 +32,14 @@ class DomeClient:
         
         print(f"✅ Dome API client initialized")
     
-    async def search_markets(self, project_name: str, limit: int = 20) -> Dict:
+    def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
-        Search Polymarket markets related to project
-        
+        Search Polymarket markets related to project (synchronous - uses Dome SDK).
+
         Args:
             project_name: Project name to search for (e.g. "ProjectX", "Bitcoin")
             limit: Max markets to return
-        
+
         Returns:
             {
                 "markets_found": [...],
@@ -266,10 +266,10 @@ class DomeClientAsync:
     async def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """Async version of search_markets"""
         # Run sync Dome SDK call in thread pool
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(
-            None, 
+            None,
             self.client.search_markets,
             project_name,
-            limit
+            limit,
         )
