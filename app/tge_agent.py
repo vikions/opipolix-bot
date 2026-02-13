@@ -130,37 +130,47 @@ class TGEAgent:
             query=f"polymarket prediction market {search_term} TGE"
         )
 
-        # Resolve known token early for fallback (check both agent name and message text)
+        # Resolve known token early (check both agent name and message text)
         known = self._resolve_known_token(project_name, message_content)
 
-        # STEP 4: Dome API Market Intelligence
+        # Debug logging
+        print(f"🔍 Known token resolution:")
+        print(f"   project_name: '{project_name}'")
+        print(f"   message_content: '{message_content}'")
+        print(f"   known token found: {known is not None}")
+        if known:
+            print(f"   → market_id: {known['market_id']}, clob_token: {known['clob_token_yes'][:20]}...")
+
+        # PRIORITY 1: If we have a known token, use it directly (Dome only for confirmation)
+        # This is faster and more reliable than searching Dome
+        if known and confidence >= 0.5:
+            print(f"✅ Using known token! confidence={confidence:.2f} >= 0.5")
+            trade_amount = self._calculate_position_size(confidence=confidence, max_amount=max_trade_amount)
+            return {
+                "action": "trade",
+                "confidence": confidence,
+                "reasoning": f"Matched known market for {project_name} with confidence {confidence:.1%}",
+                "predictos_analysis": predictos_result,
+                "discovered_tools": discovered_tools,
+                "keywords_found": keywords_found,
+                "trade_params": {
+                    "market_id": known["market_id"],
+                    "question": f"{project_name} TGE",
+                    "side": "YES",
+                    "amount_usdc": trade_amount,
+                    "expected_price": 0.50,
+                    "clob_token_yes": known["clob_token_yes"],
+                },
+            }
+
+        # STEP 4: Dome API Market Intelligence (only if no known token)
         market_data = await self.dome.search_markets(search_term)
 
         if not market_data.get("markets_found"):
-            # Fallback: if we have a known token, still allow trading
-            if known and confidence >= 0.7:
-                trade_amount = self._calculate_position_size(confidence=confidence, max_amount=max_trade_amount)
-                return {
-                    "action": "trade",
-                    "confidence": confidence,
-                    "reasoning": f"High confidence signal ({confidence:.1%}), no Dome results but matched known market",
-                    "predictos_analysis": predictos_result,
-                    "discovered_tools": discovered_tools,
-                    "keywords_found": keywords_found,
-                    "trade_params": {
-                        "market_id": known["market_id"],
-                        "question": f"{project_name} TGE",
-                        "side": "YES",
-                        "amount_usdc": trade_amount,
-                        "expected_price": 0.50,
-                        "clob_token_yes": known["clob_token_yes"],
-                    },
-                }
-
             return {
                 "action": "monitor",
                 "confidence": confidence,
-                "reasoning": f"High confidence signal ({confidence:.1%}) but no relevant markets found on Polymarket",
+                "reasoning": f"Confidence {confidence:.1%} but no known market or Dome results for {project_name}",
                 "predictos_analysis": predictos_result,
                 "discovered_tools": discovered_tools,
                 "keywords_found": keywords_found,
@@ -169,9 +179,10 @@ class TGEAgent:
         best_market = market_data["best_market"]
         opportunity_score = best_market.get("opportunity_score", 0.0)
 
-        # STEP 5: Decision Logic
+        # STEP 5: Decision Logic (only used if no known token found)
+        # Lower thresholds since Dome is just confirmation, not primary source
         should_trade = (
-            confidence >= 0.7 and opportunity_score >= 0.6 and best_market.get("liquidity", 0) > 500
+            confidence >= 0.5 and opportunity_score >= 0.5 and best_market.get("liquidity", 0) > 100
         )
 
         if should_trade:
@@ -207,12 +218,12 @@ class TGEAgent:
 
         # Not trading, provide reasoning
         reasons = []
-        if confidence < 0.7:
-            reasons.append(f"Confidence {confidence:.1%} below 70% threshold")
-        if opportunity_score < 0.6:
-            reasons.append(f"Opportunity score {opportunity_score:.1%} below 60%")
-        if best_market.get("liquidity", 0) <= 500:
-            reasons.append(f"Liquidity ${best_market.get('liquidity',0):,.0f} below $500 minimum")
+        if confidence < 0.5:
+            reasons.append(f"Confidence {confidence:.1%} below 50% threshold")
+        if opportunity_score < 0.5:
+            reasons.append(f"Opportunity score {opportunity_score:.1%} below 50%")
+        if best_market.get("liquidity", 0) <= 100:
+            reasons.append(f"Liquidity ${best_market.get('liquidity',0):,.0f} below $100 minimum")
 
         return {
             "action": "monitor",

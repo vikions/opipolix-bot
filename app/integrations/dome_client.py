@@ -255,6 +255,9 @@ class DomeClient:
         - Exact project name match in title/tags (high score)
         - TGE/token/launch keywords in title (medium score)
         - Project name in description (low score)
+
+        IMPORTANT: We want markets like "Will [Project] launch a token by..."
+        NOT markets like "[Project]ed FDV above..." or other non-TGE markets
         """
         score = 0.0
         project_lower = project_name.lower()
@@ -265,20 +268,36 @@ class DomeClient:
         description = self._safe_get(market, 'description', '') or ''
         description_lower = description.lower()
 
-        # 1. Exact project name in title (0.6 points)
-        if project_lower in title:
-            score += 0.6
+        # CRITICAL: Filter out non-TGE markets
+        # Reject markets with "fdv", "price", "above", "below" in title (these are price/valuation markets)
+        reject_keywords = ['fdv', 'price above', 'price below', 'market cap above', 'market cap below']
+        for reject in reject_keywords:
+            if reject in title:
+                print(f"❌ Rejected market (contains '{reject}'): {title[:80]}...")
+                return 0.0  # Reject completely
 
-        # 2. Project name in tags (0.3 points)
+        # 1. STRONG: Project name + TGE keywords in title (0.8 points)
+        # Look for patterns like "Will [project] launch", "[project] token", etc.
+        if project_lower in title:
+            tge_keywords = ['launch', 'token', 'tge', 'airdrop', 'listing']
+            for keyword in tge_keywords:
+                if keyword in title:
+                    score += 0.8
+                    break
+            else:
+                # Project in title but no TGE keywords - lower score
+                score += 0.3
+
+        # 2. Project name in tags (0.2 points)
         for tag in tags:
             if project_lower in tag:
-                score += 0.3
+                score += 0.2
                 break
 
-        # 3. TGE/token/launch keywords in title (0.2 points)
-        tge_keywords = ['tge', 'token', 'launch', 'airdrop', 'pre-market', 'token sales']
-        for keyword in tge_keywords:
-            if keyword in title:
+        # 3. TGE-specific tags (0.2 points)
+        tge_tags = ['pre-market', 'token sales', 'tge', 'airdrop']
+        for tag in tags:
+            if any(tge_tag in tag for tge_tag in tge_tags):
                 score += 0.2
                 break
 

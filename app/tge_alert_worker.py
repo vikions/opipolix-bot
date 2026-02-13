@@ -340,13 +340,15 @@ def build_agent_notification(message: dict, decision: dict, agent: dict) -> str:
         pa = decision["predictos_analysis"]
         text += f"*PredictOS:* intent={pa.get('intent')} confidence={pa.get('confidence'):.2f}\n"
 
-    if decision.get("discovered_tools"):
-        text += f"*x402 tools discovered:* {len(decision.get('discovered_tools',[]))}\n"
-
+    # Show market data from Dome API if available
     if decision.get("market_data"):
         bm = decision["market_data"].get("best_market")
         if bm:
-            text += f"\n*Market:* {bm.get('question')}\nLiquidity: ${bm.get('liquidity',0):,.0f}\nYES price: {bm.get('current_yes_price',0):.2f}\nOpportunity: {bm.get('opportunity_score',0):.2f}\n"
+            text += f"\n*📊 Dome API Market:*\n"
+            text += f"• {bm.get('question')}\n"
+            text += f"• Liquidity: ${bm.get('liquidity',0):,.0f}\n"
+            text += f"• YES price: {bm.get('current_yes_price',0):.2f}\n"
+            text += f"• Opportunity: {bm.get('opportunity_score',0):.2f}\n"
 
     if decision.get("action") == "trade" and decision.get("trade_params"):
         tp = decision["trade_params"]
