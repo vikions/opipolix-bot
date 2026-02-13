@@ -16,11 +16,14 @@ class PredictOSClient:
         await asyncio.sleep(0.1)
 
         text = (message_text or "").lower()
-        keywords = ["tge", "token", "airdrop", "launch", "claim", "listing"]
+        keywords = ["tge", "token", "airdrop", "launch", "claim", "listing", "announcement", "announce"]
         hits = sum(1 for k in keywords if k in text)
 
-        # Base confidence from hits (clamped)
-        confidence = min(0.95, 0.2 + 0.2 * hits)
+        # Improved confidence calculation:
+        # - 1 keyword: 0.5 (50%) - enough to trigger
+        # - 2 keywords: 0.7 (70%) - good signal
+        # - 3+ keywords: 0.9 (90%) - strong signal
+        confidence = min(0.95, 0.3 + 0.2 * hits)
 
         intent = "announce" if hits >= 1 else "unknown"
 

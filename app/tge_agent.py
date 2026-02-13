@@ -111,7 +111,9 @@ class TGEAgent:
         confidence = predictos_result.get("confidence", 0.0)
         intent = predictos_result.get("intent", "unknown")
 
-        if confidence < 0.5:
+        # Lower threshold to 0.3 (30%) to catch more signals
+        # Single TGE keyword gives 0.4 (40%) confidence, which should be enough
+        if confidence < 0.3:
             return {
                 "action": "ignore",
                 "confidence": confidence,
