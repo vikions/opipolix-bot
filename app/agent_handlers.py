@@ -152,11 +152,12 @@ async def handle_autotrade_choice(update: Update, context: ContextTypes.DEFAULT_
     # NO - alerts only
     context.user_data["agent_autotrade"] = False
     telegram_id = query.from_user.id
+    channel_name = context.user_data.get("agent_channel_name", "Custom")
     agent_id = agent_db.create_agent(
         telegram_id=telegram_id,
         discord_channel_id=context.user_data.get("agent_channel_id"),
-        agent_name=context.user_data.get("agent_name") or context.user_data.get("agent_channel_name"),
-        discord_channel_name=context.user_data.get("agent_channel_name"),
+        agent_name=context.user_data.get("agent_name") or channel_name,
+        discord_channel_name=channel_name,
         auto_trade_enabled=False,
         max_trade_amount_usdc=0,
     )
@@ -164,7 +165,7 @@ async def handle_autotrade_choice(update: Update, context: ContextTypes.DEFAULT_
     context.user_data.clear()
 
     await query.edit_message_text(
-        f"✅ *AGENT CREATED!*\n\n🆔 Agent ID: `{agent_id}`\n📡 Channel: {context.user_data.get('agent_channel_name', 'Custom')}\n🤖 Mode: ALERTS ONLY\n🟢 Status: ACTIVE",
+        f"✅ *AGENT CREATED!*\n\n🆔 Agent ID: `{agent_id}`\n📡 Channel: {channel_name}\n🤖 Mode: ALERTS ONLY\n🟢 Status: ACTIVE",
         parse_mode="Markdown",
     )
 
@@ -198,6 +199,94 @@ async def handle_list_agents(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
+async def handle_manage_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show details and management options for a single agent"""
+    query = update.callback_query
+    await query.answer()
+
+    # Extract agent id from callback data like "agent_manage_5"
+    try:
+        agent_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Invalid agent ID.")
+        return
+
+    telegram_id = query.from_user.id
+    agents = agent_db.get_user_agents(telegram_id)
+    agent = next((a for a in agents if a["id"] == agent_id), None)
+
+    if not agent:
+        await query.edit_message_text("❌ Agent not found or does not belong to you.")
+        return
+
+    status_emoji = "🟢" if agent["status"] == "active" else "⏸"
+    trade_mode = f"💸 Auto-trade: ${agent['max_trade_amount_usdc']}" if agent["auto_trade_enabled"] else "🔔 Alerts only"
+    toggle_label = "⏸ Pause Agent" if agent["status"] == "active" else "▶️ Resume Agent"
+
+    text = (
+        f"⚙️ *Manage Agent #{agent_id}*\n\n"
+        f"{status_emoji} Status: {agent['status'].upper()}\n"
+        f"📡 Channel: {agent.get('discord_channel_name') or 'Custom'}\n"
+        f"{trade_mode}\n"
+        f"📅 Created: {agent.get('created_at', 'N/A')}\n"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton(toggle_label, callback_data=f"agent_toggle_{agent_id}")],
+        [InlineKeyboardButton("🗑 Delete Agent", callback_data=f"agent_delete_{agent_id}")],
+        [InlineKeyboardButton("🔙 Back to My Agents", callback_data="agent_list")],
+    ]
+
+    await query.edit_message_text(text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+
+
+async def handle_toggle_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Toggle agent active/paused status"""
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        agent_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Invalid agent ID.")
+        return
+
+    new_status = agent_db.toggle_agent_status(agent_id)
+    if new_status == "not_found":
+        await query.edit_message_text("❌ Agent not found.")
+        return
+
+    emoji = "🟢" if new_status == "active" else "⏸"
+    await query.edit_message_text(
+        f"{emoji} Agent #{agent_id} is now *{new_status.upper()}*",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back to Agent", callback_data=f"agent_manage_{agent_id}")],
+        ]),
+        parse_mode="Markdown",
+    )
+
+
+async def handle_delete_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Delete an agent"""
+    query = update.callback_query
+    await query.answer()
+
+    try:
+        agent_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("❌ Invalid agent ID.")
+        return
+
+    agent_db.delete_agent(agent_id)
+
+    await query.edit_message_text(
+        f"🗑 Agent #{agent_id} has been deleted.",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Back to My Agents", callback_data="agent_list")],
+        ]),
+    )
+
+
 # Mapping for callback dispatch
 AGENT_HANDLERS = {
     "agent_menu": show_agent_menu,
@@ -206,4 +295,7 @@ AGENT_HANDLERS = {
     "agent_autotrade_yes": handle_autotrade_choice,
     "agent_autotrade_no": handle_autotrade_choice,
     "agent_list": handle_list_agents,
+    "agent_manage_": handle_manage_agent,
+    "agent_toggle_": handle_toggle_agent,
+    "agent_delete_": handle_delete_agent,
 }

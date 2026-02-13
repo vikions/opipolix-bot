@@ -12,6 +12,10 @@ from tge_alert_config import find_keywords, format_keywords, truncate_text
 from tge_alert_db import TgeAlertDatabase
 from tge_discord_monitor import DiscordMonitor
 from tge_projects import get_project_config
+from agent_db import AgentDatabase
+from tge_agent import TGEAgent
+from clob_trading import trade_market
+from wallet_manager import WalletManager
 
 
 logging.basicConfig(
@@ -224,16 +228,6 @@ Agent-based TGE Alert Worker
 This worker runs active user agents, checks their configured Discord channels,
 passes messages through the `TGEAgent` pipeline and optionally executes trades.
 """
-import asyncio
-import os
-from telegram import Bot
-from agent_db import AgentDatabase
-from tge_agent import TGEAgent
-from tge_discord_monitor import DiscordMonitor
-from tge_alert_db import TgeAlertDatabase
-from clob_trading import trade_market
-from wallet_manager import WalletManager
-
 
 agent_db = AgentDatabase()
 alert_db = TgeAlertDatabase()
@@ -387,30 +381,30 @@ async def execute_agent_trade(agent: dict, decision: dict, bot: Bot, telegram_id
             telegram_id=telegram_id,
             funder_address=wallet.get("safe_address"),
         )
-
-        order_id = result.get("order_id")
-
-        # Update log entry with trade result -- append via new log (simple)
-        agent_db.log_decision(
-            agent_id=agent["id"],
-            discord_message_id=decision.get("discord_message_id"),
-            signal_text=(decision.get("predictos_analysis",{}).get("raw_text") or "")[:2000],
-            confidence_score=decision.get("confidence",0.0),
-            action="trade_executed",
-            reasoning=decision.get("reasoning",""),
-            trade_executed=True,
-            trade_amount_usdc=amount,
-            trade_order_id=str(order_id),
-        )
-
-        await bot.send_message(
-            chat_id=telegram_id,
-            text=f"✅ *TRADE EXECUTED*\n\nOrder ID: `{order_id}`\nAmount: ${amount}\n",
-            parse_mode="Markdown",
-        )
-
     except Exception as e:
         await bot.send_message(chat_id=telegram_id, text=f"❌ Trade failed: {e}")
+        return
+
+    order_id = result.get("order_id")
+
+    # Update log entry with trade result -- append via new log (simple)
+    agent_db.log_decision(
+        agent_id=agent["id"],
+        discord_message_id=decision.get("discord_message_id"),
+        signal_text=(decision.get("predictos_analysis",{}).get("raw_text") or "")[:2000],
+        confidence_score=decision.get("confidence",0.0),
+        action="trade_executed",
+        reasoning=decision.get("reasoning",""),
+        trade_executed=True,
+        trade_amount_usdc=amount,
+        trade_order_id=str(order_id),
+    )
+
+    await bot.send_message(
+        chat_id=telegram_id,
+        text=f"✅ *TRADE EXECUTED*\n\nOrder ID: `{order_id}`\nAmount: ${amount}\n",
+        parse_mode="Markdown",
+    )
 
 
 async def check_agents_once():
