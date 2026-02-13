@@ -385,7 +385,16 @@ async def execute_agent_trade(agent: dict, decision: dict, bot: Bot, telegram_id
         await bot.send_message(chat_id=telegram_id, text=f"❌ Trade failed: {e}")
         return
 
-    order_id = result.get("order_id")
+    print(f"🔍 Trade result keys: {result.keys() if isinstance(result, dict) else type(result)}")
+    print(f"🔍 Trade result: {result}")
+
+    # trade_market may return order_id under different keys
+    order_id = (
+        result.get("order_id")
+        or result.get("orderID")
+        or result.get("id")
+        or result.get("order_ids", [None])[0]
+    )
 
     # Update log entry with trade result -- append via new log (simple)
     agent_db.log_decision(

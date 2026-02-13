@@ -66,6 +66,20 @@ class TGEAgent:
                         return token_info
         return None
 
+    @staticmethod
+    def _extract_search_term(message_content: str, fallback: str) -> str:
+        """Extract best Dome search term from message by matching known project keywords.
+
+        Returns the first matching keyword (e.g. "base") so Dome searches for
+        the actual project instead of the agent name like "testagent".
+        """
+        msg_lower = message_content.lower()
+        for market_key, token_info in KNOWN_MARKET_TOKENS.items():
+            for kw in token_info["keywords"]:
+                if kw in msg_lower:
+                    return market_key
+        return fallback
+
     async def analyze_signal(
         self,
         message_content: str,
@@ -107,15 +121,18 @@ class TGEAgent:
             }
 
         # STEP 3: x402 Tool Discovery
+        # Use actual project keyword from message for better search results
+        search_term = self._extract_search_term(message_content, project_name)
+
         discovered_tools = await self.x402.discover_tools(
-            query=f"polymarket prediction market {project_name} TGE"
+            query=f"polymarket prediction market {search_term} TGE"
         )
 
         # Resolve known token early for fallback (check both agent name and message text)
         known = self._resolve_known_token(project_name, message_content)
 
         # STEP 4: Dome API Market Intelligence
-        market_data = await self.dome.search_markets(project_name)
+        market_data = await self.dome.search_markets(search_term)
 
         if not market_data.get("markets_found"):
             # Fallback: if we have a known token, still allow trading
@@ -133,7 +150,7 @@ class TGEAgent:
                         "question": f"{project_name} TGE",
                         "side": "YES",
                         "amount_usdc": trade_amount,
-                        "expected_price": None,
+                        "expected_price": 0.50,
                         "clob_token_yes": known["clob_token_yes"],
                     },
                 }
@@ -161,9 +178,12 @@ class TGEAgent:
             # Use Dome's clob_token_yes if available, otherwise fall back to known tokens
             clob_token = best_market.get("clob_token_yes")
             market_id = best_market.get("market_id")
+            expected_price = best_market.get("current_yes_price")
             if not clob_token and known:
                 clob_token = known["clob_token_yes"]
                 market_id = market_id or known["market_id"]
+            if expected_price is None:
+                expected_price = 0.50
 
             return {
                 "action": "trade",
@@ -178,7 +198,7 @@ class TGEAgent:
                     "question": best_market.get("question"),
                     "side": "YES",
                     "amount_usdc": trade_amount,
-                    "expected_price": best_market.get("current_yes_price"),
+                    "expected_price": expected_price,
                     "clob_token_yes": clob_token,
                 },
             }
@@ -203,7 +223,9 @@ class TGEAgent:
         }
 
     def _calculate_position_size(self, confidence: float, max_amount: float) -> float:
+        max_amount = max(1.0, max_amount)  # Polymarket CLOB minimum is $1
         min_pct = 0.2
         scale = min_pct + (1.0 - min_pct) * confidence
         amount = max_amount * scale
-        return round(amount, 2)
+        amount = max(1.0, round(amount, 2))  # enforce $1 floor
+        return amount
