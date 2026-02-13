@@ -53,10 +53,17 @@ class DomeClient:
 
     @staticmethod
     def _safe_get(obj, key: str, default=None):
-        """Get a value from a dict OR an SDK object attribute."""
+        """Get a value from a dict OR an SDK object attribute.
+        
+        Handles both dict access and pydantic models that may raise
+        KeyError from __getattr__ (not just AttributeError).
+        """
         if isinstance(obj, dict):
             return obj.get(key, default)
-        return getattr(obj, key, default)
+        try:
+            return getattr(obj, key)
+        except Exception:
+            return default
 
     def _dome_search(self, query: str, limit: int) -> list:
         """Run a single Dome SDK search and return raw market list."""
@@ -65,6 +72,11 @@ class DomeClient:
             "status": "open",
             "limit": limit,
         })
+        
+        # Debug logging to understand SDK response structure
+        print(f"🔍 Dome SDK response type: {type(response)}")
+        print(f"   Has 'markets': {hasattr(response, 'markets')}")
+        
         raw = response.markets if hasattr(response, 'markets') else []
         # Convert SDK objects to dicts
         markets = []
