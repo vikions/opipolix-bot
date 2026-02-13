@@ -69,10 +69,10 @@ class DomeClient:
     def _dome_search(self, query: str, limit: int) -> list:
         """Run a single Dome SDK search and return raw market list."""
         try:
-            # Don't include 'status' parameter - it may cause issues with some SDK versions
-            # Instead, we'll filter closed markets manually after fetching
+            # status parameter is REQUIRED when using search parameter
             response = self.dome.polymarket.markets.get_markets({
                 "search": query,
+                "status": "open",
                 "limit": limit,
             })
 
@@ -86,11 +86,6 @@ class DomeClient:
             for m in raw:
                 try:
                     market_dict = self._market_to_dict(m)
-                    # Filter out closed markets manually
-                    market_status = self._safe_get(market_dict, 'status', 'unknown')
-                    if market_status == 'closed':
-                        print(f"⏭️ Skipping closed market: {self._safe_get(market_dict, 'title', '?')}")
-                        continue
                     markets.append(market_dict)
                 except Exception as e:
                     print(f"⚠️ Could not convert market object: {e}, type={type(m)}")
