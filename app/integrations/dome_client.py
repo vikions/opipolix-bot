@@ -35,27 +35,55 @@ class DomeClient:
     @staticmethod
     def _market_to_dict(market) -> dict:
         """Convert a Dome SDK Market object to a plain dict."""
-        # Try common SDK serialization methods
         if isinstance(market, dict):
             return market
-        if hasattr(market, 'to_dict'):
-            return market.to_dict()
-        if hasattr(market, 'model_dump'):          # pydantic v2
-            return market.model_dump()
-        if hasattr(market, 'dict'):                 # pydantic v1
-            return market.dict()
+        # Try SDK / pydantic serialization methods first
+        for method in ('to_dict', 'model_dump', 'dict'):
+            fn = getattr(market, method, None)
+            if callable(fn):
+                try:
+                    return fn()
+                except Exception:
+                    continue
+        # Fall back to __dict__
         if hasattr(market, '__dict__'):
             return {k: v for k, v in market.__dict__.items() if not k.startswith('_')}
-        # Last resort
         print(f"⚠️ Unknown Dome market type: {type(market)}, attrs: {dir(market)}")
         return vars(market)
+
+    @staticmethod
+    def _safe_get(obj, key: str, default=None):
+        """Get a value from a dict OR an SDK object attribute."""
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    def _dome_search(self, query: str, limit: int) -> list:
+        """Run a single Dome SDK search and return raw market list."""
+        response = self.dome.polymarket.markets.get_markets({
+            "search": query,
+            "status": "open",
+            "limit": limit,
+        })
+        raw = response.markets if hasattr(response, 'markets') else []
+        # Convert SDK objects to dicts
+        markets = []
+        for m in raw:
+            try:
+                markets.append(self._market_to_dict(m))
+            except Exception as e:
+                print(f"⚠️ Could not convert market object: {e}, type={type(m)}")
+        return markets
 
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).
 
+        Uses the Dome ``search`` parameter for server-side filtering, then tries
+        progressively broader search terms if the first query returns nothing.
+
         Args:
-            project_name: Project name to search for (e.g. "ProjectX", "Bitcoin")
+            project_name: Project name to search for (e.g. "base", "metamask")
             limit: Max markets to return
 
         Returns:
@@ -66,120 +94,97 @@ class DomeClient:
                 "source": "Dome API (real)"
             }
         """
-        
+
         try:
-            print(f"🔍 Searching Dome API for markets about: {project_name}")
-            
-            # Search markets using Dome SDK
-            # Note: Dome API searches across all Polymarket markets
-            # We filter by tags, title, description containing our project name
-            response = self.dome.polymarket.markets.get_markets({
-                "limit": limit,
-                # If Dome supports text search, use it:
-                # "search": project_name,
-            })
-            
-            raw_markets = response.markets if hasattr(response, 'markets') else []
+            # Build search variations: exact term first, then broader phrases
+            search_terms = [
+                project_name,
+                f"{project_name} token",
+                f"{project_name} launch",
+            ]
 
-            # Convert SDK objects to dicts
-            all_markets = []
-            for m in raw_markets:
-                try:
-                    all_markets.append(self._market_to_dict(m))
-                except Exception as conv_err:
-                    print(f"⚠️ Could not convert market object: {conv_err}, type={type(m)}")
+            all_markets: list = []
+            used_term = project_name
 
-            # Filter markets relevant to our project
-            # Search in: title, tags, description
-            project_lower = project_name.lower()
-            relevant_markets = []
+            for term in search_terms:
+                print(f"🔍 Dome search: '{term}'")
+                results = self._dome_search(term, limit)
+                if results:
+                    all_markets = results
+                    used_term = term
+                    break
 
-            for market in all_markets:
-                title = market.get('title', '').lower()
-                description = market.get('description', '').lower()
-                tags = [tag.lower() for tag in market.get('tags', [])]
-                
-                # Check if project name appears anywhere
-                if (project_lower in title or 
-                    project_lower in description or 
-                    any(project_lower in tag for tag in tags)):
-                    
-                    relevant_markets.append(market)
-            
-            if not relevant_markets:
-                print(f"❌ No markets found for {project_name}")
+            if not all_markets:
+                print(f"❌ No Dome results for any variation of '{project_name}'")
                 return self._empty_response()
-            
-            print(f"✅ Found {len(relevant_markets)} relevant markets")
-            
+
+            first_title = all_markets[0].get('title', '?') if all_markets else '?'
+            print(f"✅ Dome found {len(all_markets)} markets for '{used_term}' "
+                  f"(first: {first_title})")
+
             # Transform to our format and enrich
             enriched_markets = []
-            for market in relevant_markets:
-                enriched = self._transform_market(market)
-                enriched_markets.append(enriched)
-            
-            # Sort by opportunity score (calculated below)
+            for market in all_markets:
+                try:
+                    enriched = self._transform_market(market)
+                    enriched_markets.append(enriched)
+                except Exception as e:
+                    print(f"⚠️ Failed to transform market: {e}")
+
+            if not enriched_markets:
+                return self._empty_response()
+
             enriched_markets.sort(key=lambda m: m['opportunity_score'], reverse=True)
-            
+
             return {
                 "markets_found": enriched_markets,
-                "best_market": enriched_markets[0] if enriched_markets else None,
+                "best_market": enriched_markets[0],
                 "total_count": len(enriched_markets),
                 "source": "Dome API (real)"
             }
-        
+
         except Exception as e:
             print(f"❌ Error calling Dome API: {e}")
-            # Return fallback mock for demo resilience
             return self._fallback_response(project_name)
     
-    def _transform_market(self, market: dict) -> dict:
+    def _transform_market(self, market) -> dict:
         """
-        Transform Dome API market format to our agent format
-        
+        Transform Dome API market (dict or SDK object) to our agent format.
+
         Dome market structure:
         - market_slug, event_slug, condition_id
         - title, description, tags
         - volume_total, volume_1_week, volume_1_month
         - side_a (label, id), side_b (label, id)
         - status (open/closed), start_time, end_time
-        - extra_fields (varies by market type)
         """
-        
-        # Extract basic info
-        market_id = market.get('market_slug', '')
-        question = market.get('title', '')
-        description = market.get('description', '')
-        status = market.get('status', 'unknown')
-        
+        g = self._safe_get  # shorthand
+
+        market_id = g(market, 'market_slug', '')
+        question = g(market, 'title', '')
+        description = g(market, 'description', '')
+        status = g(market, 'status', 'unknown')
+
         # Volume data
-        volume_total = float(market.get('volume_total', 0))
-        volume_week = float(market.get('volume_1_week', 0))
-        volume_month = float(market.get('volume_1_month', 0))
-        
-        # Use week volume as proxy for 24h (Dome doesn't have 24h directly)
+        volume_total = float(g(market, 'volume_total', 0) or 0)
+        volume_week = float(g(market, 'volume_1_week', 0) or 0)
+        volume_month = float(g(market, 'volume_1_month', 0) or 0)
+
         volume_24h = volume_week / 7 if volume_week > 0 else volume_month / 30
-        
-        # Sides (YES/NO or custom labels like Up/Down)
-        side_a_raw = market.get('side_a', {})
-        side_b_raw = market.get('side_b', {})
+
+        # Sides — may be dicts or SDK objects
+        side_a_raw = g(market, 'side_a', None)
+        side_b_raw = g(market, 'side_b', None)
         side_a = self._market_to_dict(side_a_raw) if side_a_raw and not isinstance(side_a_raw, dict) else (side_a_raw or {})
         side_b = self._market_to_dict(side_b_raw) if side_b_raw and not isinstance(side_b_raw, dict) else (side_b_raw or {})
-        
-        # For binary markets, assume side_a is YES
-        # Note: Dome doesn't directly provide current prices in market list
-        # You may need to call additional endpoint or use orderbook data
-        # For now, we'll estimate or set placeholder
-        
-        # Estimate liquidity from volume (rough proxy)
-        # Real liquidity would need orderbook depth
-        estimated_liquidity = volume_total * 0.3  # Rough estimate
-        
-        # Placeholder prices (would need orderbook API call for real prices)
-        yes_price = 0.5  # Placeholder - update if Dome provides this
-        no_price = 0.5   # Placeholder
-        
-        # Build enriched market object
+
+        # Estimate liquidity from volume (rough proxy; real needs orderbook)
+        estimated_liquidity = volume_total * 0.3
+
+        # Placeholder prices
+        yes_price = 0.5
+        no_price = 0.5
+
         enriched = {
             "market_id": market_id,
             "question": question,
@@ -190,22 +195,18 @@ class DomeClient:
             "volume_24h": volume_24h,
             "volume_total": volume_total,
             "active": status == "open",
-            "end_date": market.get('end_time'),
-            "tags": market.get('tags', []),
-            "url": f"https://polymarket.com/event/{market.get('event_slug', '')}/{market_id}",
-            
-            # Raw Dome data for debugging
+            "end_date": g(market, 'end_time', None),
+            "tags": g(market, 'tags', []) or [],
+            "url": f"https://polymarket.com/event/{g(market, 'event_slug', '')}/{market_id}",
             "dome_raw": {
-                "condition_id": market.get('condition_id'),
-                "side_a_label": side_a.get('label'),
-                "side_b_label": side_b.get('label'),
-                "status": status
-            }
+                "condition_id": g(market, 'condition_id', None),
+                "side_a_label": self._safe_get(side_a, 'label', None),
+                "side_b_label": self._safe_get(side_b, 'label', None),
+                "status": status,
+            },
         }
-        
-        # Calculate opportunity score
+
         enriched['opportunity_score'] = self._calculate_opportunity_score(enriched)
-        
         return enriched
     
     def _calculate_opportunity_score(self, market: Dict) -> float:
