@@ -31,7 +31,25 @@ class DomeClient:
         })
         
         print(f"✅ Dome API client initialized")
-    
+
+    @staticmethod
+    def _market_to_dict(market) -> dict:
+        """Convert a Dome SDK Market object to a plain dict."""
+        # Try common SDK serialization methods
+        if isinstance(market, dict):
+            return market
+        if hasattr(market, 'to_dict'):
+            return market.to_dict()
+        if hasattr(market, 'model_dump'):          # pydantic v2
+            return market.model_dump()
+        if hasattr(market, 'dict'):                 # pydantic v1
+            return market.dict()
+        if hasattr(market, '__dict__'):
+            return {k: v for k, v in market.__dict__.items() if not k.startswith('_')}
+        # Last resort
+        print(f"⚠️ Unknown Dome market type: {type(market)}, attrs: {dir(market)}")
+        return vars(market)
+
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).
@@ -61,13 +79,21 @@ class DomeClient:
                 # "search": project_name,
             })
             
-            all_markets = response.markets
-            
+            raw_markets = response.markets if hasattr(response, 'markets') else []
+
+            # Convert SDK objects to dicts
+            all_markets = []
+            for m in raw_markets:
+                try:
+                    all_markets.append(self._market_to_dict(m))
+                except Exception as conv_err:
+                    print(f"⚠️ Could not convert market object: {conv_err}, type={type(m)}")
+
             # Filter markets relevant to our project
             # Search in: title, tags, description
             project_lower = project_name.lower()
             relevant_markets = []
-            
+
             for market in all_markets:
                 title = market.get('title', '').lower()
                 description = market.get('description', '').lower()
@@ -135,8 +161,10 @@ class DomeClient:
         volume_24h = volume_week / 7 if volume_week > 0 else volume_month / 30
         
         # Sides (YES/NO or custom labels like Up/Down)
-        side_a = market.get('side_a', {})
-        side_b = market.get('side_b', {})
+        side_a_raw = market.get('side_a', {})
+        side_b_raw = market.get('side_b', {})
+        side_a = self._market_to_dict(side_a_raw) if side_a_raw and not isinstance(side_a_raw, dict) else (side_a_raw or {})
+        side_b = self._market_to_dict(side_b_raw) if side_b_raw and not isinstance(side_b_raw, dict) else (side_b_raw or {})
         
         # For binary markets, assume side_a is YES
         # Note: Dome doesn't directly provide current prices in market list

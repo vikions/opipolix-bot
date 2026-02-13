@@ -56,13 +56,14 @@ class TGEAgent:
         self.dome = DomeClient()
         self.x402 = X402Client()
 
-    def _resolve_known_token(self, project_name: str) -> Optional[Dict]:
-        """Match project_name against KNOWN_MARKET_TOKENS by keyword substring."""
-        name_lower = project_name.lower()
+    def _resolve_known_token(self, project_name: str, message_content: str = "") -> Optional[Dict]:
+        """Match project_name or message_content against KNOWN_MARKET_TOKENS by keyword substring."""
+        texts_to_check = [project_name.lower(), message_content.lower()]
         for token_info in KNOWN_MARKET_TOKENS.values():
             for kw in token_info["keywords"]:
-                if kw in name_lower:
-                    return token_info
+                for text in texts_to_check:
+                    if kw in text:
+                        return token_info
         return None
 
     async def analyze_signal(
@@ -110,15 +111,15 @@ class TGEAgent:
             query=f"polymarket prediction market {project_name} TGE"
         )
 
-        # Resolve known token early for fallback
-        known = self._resolve_known_token(project_name)
+        # Resolve known token early for fallback (check both agent name and message text)
+        known = self._resolve_known_token(project_name, message_content)
 
         # STEP 4: Dome API Market Intelligence
         market_data = await self.dome.search_markets(project_name)
 
         if not market_data.get("markets_found"):
             # Fallback: if we have a known token, still allow trading
-            if known and confidence > 0.7:
+            if known and confidence >= 0.7:
                 trade_amount = self._calculate_position_size(confidence=confidence, max_amount=max_trade_amount)
                 return {
                     "action": "trade",
@@ -151,7 +152,7 @@ class TGEAgent:
 
         # STEP 5: Decision Logic
         should_trade = (
-            confidence > 0.7 and opportunity_score > 0.6 and best_market.get("liquidity", 0) > 500
+            confidence >= 0.7 and opportunity_score >= 0.6 and best_market.get("liquidity", 0) > 500
         )
 
         if should_trade:
@@ -184,9 +185,9 @@ class TGEAgent:
 
         # Not trading, provide reasoning
         reasons = []
-        if confidence <= 0.7:
+        if confidence < 0.7:
             reasons.append(f"Confidence {confidence:.1%} below 70% threshold")
-        if opportunity_score <= 0.6:
+        if opportunity_score < 0.6:
             reasons.append(f"Opportunity score {opportunity_score:.1%} below 60%")
         if best_market.get("liquidity", 0) <= 500:
             reasons.append(f"Liquidity ${best_market.get('liquidity',0):,.0f} below $500 minimum")
