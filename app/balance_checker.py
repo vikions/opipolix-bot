@@ -3,6 +3,7 @@ Balance Checker для OpiPoliX бота
 Проверка балансов USDC и позиций на маркетах
 """
 import os
+import time
 from typing import Dict
 from web3 import Web3
 from dotenv import load_dotenv
@@ -24,8 +25,8 @@ MARKET_TOKENS = {
         "no": "77680902575693269510705775150133261883431641996305813878639196300490247886068"
     },
     "base": {
-        "yes": "104771646709660831592727707032658923058293444911215259720234012315470229507167",
-        "no": "91704486839398022652930625279905848372527977307744447009017770224967808697336"
+        "yes": "73916079699906389194973750600611907885736641148308464550611829122042479621960",
+        "no": "18540654723265127340914175052901870362827093390191432625825387620330024766955"
     },
     "abstract": {
         "yes": "105292534464588119413823901919588224897612305776681795693919323419047416388812",
@@ -107,19 +108,65 @@ class BalanceChecker:
             print(f"Error getting USDC balance: {e}")
             return 0.0
     
-    def get_position_balance(self, address: str, token_id: str) -> float:
-       
-        try:
-            checksum_address = Web3.to_checksum_address(address)
-            balance = self.ctf_contract.functions.balanceOf(
-                checksum_address,
-                int(token_id)
-            ).call()
-            return float(balance)
-        except Exception as e:
-            print(f"Error getting position balance: {e}")
-            return 0.0
+    def get_position_balance(self, address: str, token_id: str, retry_count: int = 3) -> float:
+        """Get position balance with retry logic for rate limiting"""
+        checksum_address = Web3.to_checksum_address(address)
+
+        for attempt in range(retry_count):
+            try:
+                balance = self.ctf_contract.functions.balanceOf(
+                    checksum_address,
+                    int(token_id)
+                ).call()
+                return float(balance)
+            except Exception as e:
+                error_msg = str(e)
+
+                # Check if rate limit error
+                if 'rate limit' in error_msg.lower() or 'too many requests' in error_msg.lower():
+                    if attempt < retry_count - 1:
+                        # Wait with exponential backoff
+                        wait_time = 2 ** attempt  # 1s, 2s, 4s
+                        print(f"⏳ Rate limit hit, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+
+                print(f"Error getting position balance: {e}")
+                return 0.0
+
+        return 0.0
     
+    def get_single_market_position(self, address: str, market_name: str) -> Dict:
+        """Quick check for a single market position (useful after trade)"""
+        if market_name not in MARKET_TOKENS:
+            return {"yes": 0.0, "no": 0.0, "yes_usd": 0.0, "no_usd": 0.0}
+
+        checksum_address = Web3.to_checksum_address(address)
+        yes_token = MARKET_TOKENS[market_name]['yes']
+        no_token = MARKET_TOKENS[market_name]['no']
+
+        # Get balances
+        yes_balance = self.get_position_balance(checksum_address, yes_token)
+        time.sleep(0.5)  # Small delay between requests
+        no_balance = self.get_position_balance(checksum_address, no_token)
+
+        # Get prices and calculate USD value
+        yes_shares = yes_balance / 1e6
+        no_shares = no_balance / 1e6
+
+        yes_price = self.get_token_price(yes_token)
+        no_price = self.get_token_price(no_token)
+
+        yes_usd = yes_shares * yes_price if yes_price > 0 else 0
+        no_usd = no_shares * no_price if no_price > 0 else 0
+
+        return {
+            "yes": yes_shares,
+            "no": no_shares,
+            "yes_usd": yes_usd,
+            "no_usd": no_usd
+        }
+
     def get_token_price(self, token_id: str) -> float:
         """Get current price of token from Polymarket CLOB API"""
         try:
@@ -192,27 +239,34 @@ class BalanceChecker:
         }
         
         if safe_address:
+            # Add small delay between requests to avoid rate limiting
+            delay = 0.3  # 300ms between requests
+
             # MetaMask positions
             if MARKET_TOKENS['metamask']['yes'] != 'TBD':
                 positions['metamask']['yes'] = self.get_position_balance(
-                    safe_address, 
+                    safe_address,
                     MARKET_TOKENS['metamask']['yes']
                 )
+                time.sleep(delay)
                 positions['metamask']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['metamask']['no']
                 )
+                time.sleep(delay)
             
-            # Base positions 
+            # Base positions
             if MARKET_TOKENS['base']['yes'] != 'TBD':
                 positions['base']['yes'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['base']['yes']
                 )
+                time.sleep(delay)
                 positions['base']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['base']['no']
                 )
+                time.sleep(delay)
             
             # Abstract positions
             if MARKET_TOKENS['abstract']['yes'] != 'TBD':
