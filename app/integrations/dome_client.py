@@ -6,8 +6,10 @@ SDK: pip install dome-api-sdk
 
 import os
 import time
+import requests
 from typing import Dict, List, Optional
-from dome_api_sdk import DomeClient as DomeSDK
+# Note: dome-api-sdk has a bug with 'status' field, so we use direct HTTP requests
+# from dome_api_sdk import DomeClient as DomeSDK
 
 
 class DomeClient:
@@ -22,35 +24,23 @@ class DomeClient:
     
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv('DOME_API_KEY')
-        
+
         if not self.api_key:
             raise ValueError("DOME_API_KEY not found in environment. Add to .env file.")
-        
-        # Initialize official Dome SDK
-        self.dome = DomeSDK({
-            "api_key": self.api_key
-        })
-        
-        print(f"✅ Dome API client initialized")
+
+        # Use direct HTTP requests to avoid SDK bugs
+        self.base_url = "https://api.domeapi.io/v1"
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        print(f"✅ Dome API client initialized (direct HTTP mode)")
 
     @staticmethod
     def _market_to_dict(market) -> dict:
-        """Convert a Dome SDK Market object to a plain dict."""
-        if isinstance(market, dict):
-            return market
-        # Try SDK / pydantic serialization methods first
-        for method in ('to_dict', 'model_dump', 'dict'):
-            fn = getattr(market, method, None)
-            if callable(fn):
-                try:
-                    return fn()
-                except Exception:
-                    continue
-        # Fall back to __dict__
-        if hasattr(market, '__dict__'):
-            return {k: v for k, v in market.__dict__.items() if not k.startswith('_')}
-        print(f"⚠️ Unknown Dome market type: {type(market)}, attrs: {dir(market)}")
-        return vars(market)
+        """Convert market data to dict. Now just returns as-is since we get JSON directly."""
+        return market if isinstance(market, dict) else {}
 
     @staticmethod
     def _safe_get(obj, key: str, default=None):
@@ -67,30 +57,34 @@ class DomeClient:
             return default
 
     def _dome_search(self, query: str, limit: int) -> list:
-        """Run a single Dome SDK search and return raw market list."""
+        """Run a direct HTTP request to Dome API and return raw market list."""
         try:
-            # status parameter is REQUIRED when using search parameter
-            response = self.dome.polymarket.markets.get_markets({
+            # Use direct HTTP request to avoid SDK bugs with 'status' field
+            params = {
                 "search": query,
                 "status": "open",
                 "limit": limit,
-            })
+            }
 
-            # Debug logging to understand SDK response structure
-            print(f"🔍 Dome SDK response type: {type(response)}")
-            print(f"   Has 'markets': {hasattr(response, 'markets')}")
+            response = requests.get(
+                f"{self.base_url}/polymarket/markets",
+                headers=self.headers,
+                params=params,
+                timeout=10
+            )
 
-            raw = response.markets if hasattr(response, 'markets') else []
-            # Convert SDK objects to dicts
-            markets = []
-            for m in raw:
-                try:
-                    market_dict = self._market_to_dict(m)
-                    markets.append(market_dict)
-                except Exception as e:
-                    print(f"⚠️ Could not convert market object: {e}, type={type(m)}")
+            response.raise_for_status()
+            data = response.json()
+
+            # Debug logging
+            print(f"🔍 Dome API response status: {response.status_code}")
+            print(f"   Response has 'markets': {'markets' in data}")
+
+            markets = data.get('markets', [])
+            print(f"   Found {len(markets)} markets")
+
             return markets
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             print(f"❌ Dome API request failed: {e}")
             # Re-raise to be caught by caller's error handling
             raise
