@@ -68,25 +68,37 @@ class DomeClient:
 
     def _dome_search(self, query: str, limit: int) -> list:
         """Run a single Dome SDK search and return raw market list."""
-        response = self.dome.polymarket.markets.get_markets({
-            "search": query,
-            "status": "open",
-            "limit": limit,
-        })
-        
-        # Debug logging to understand SDK response structure
-        print(f"🔍 Dome SDK response type: {type(response)}")
-        print(f"   Has 'markets': {hasattr(response, 'markets')}")
-        
-        raw = response.markets if hasattr(response, 'markets') else []
-        # Convert SDK objects to dicts
-        markets = []
-        for m in raw:
-            try:
-                markets.append(self._market_to_dict(m))
-            except Exception as e:
-                print(f"⚠️ Could not convert market object: {e}, type={type(m)}")
-        return markets
+        try:
+            # Don't include 'status' parameter - it may cause issues with some SDK versions
+            # Instead, we'll filter closed markets manually after fetching
+            response = self.dome.polymarket.markets.get_markets({
+                "search": query,
+                "limit": limit,
+            })
+
+            # Debug logging to understand SDK response structure
+            print(f"🔍 Dome SDK response type: {type(response)}")
+            print(f"   Has 'markets': {hasattr(response, 'markets')}")
+
+            raw = response.markets if hasattr(response, 'markets') else []
+            # Convert SDK objects to dicts
+            markets = []
+            for m in raw:
+                try:
+                    market_dict = self._market_to_dict(m)
+                    # Filter out closed markets manually
+                    market_status = self._safe_get(market_dict, 'status', 'unknown')
+                    if market_status == 'closed':
+                        print(f"⏭️ Skipping closed market: {self._safe_get(market_dict, 'title', '?')}")
+                        continue
+                    markets.append(market_dict)
+                except Exception as e:
+                    print(f"⚠️ Could not convert market object: {e}, type={type(m)}")
+            return markets
+        except Exception as e:
+            print(f"❌ Dome API request failed: {e}")
+            # Re-raise to be caught by caller's error handling
+            raise
 
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
@@ -131,15 +143,15 @@ class DomeClient:
                 print(f"❌ No Dome results for any variation of '{project_name}'")
                 return self._empty_response()
 
-            first_title = all_markets[0].get('title', '?') if all_markets else '?'
-            print(f"✅ Dome found {len(all_markets)} markets for '{used_term}' "
-                  f"(first: {first_title})")
+            print(f"✅ Dome found {len(all_markets)} markets for '{used_term}'")
 
             # Transform to our format and enrich
             enriched_markets = []
             for market in all_markets:
                 try:
                     enriched = self._transform_market(market)
+                    # Calculate relevance score for filtering
+                    enriched['relevance_score'] = self._calculate_relevance(market, project_name)
                     enriched_markets.append(enriched)
                 except Exception as e:
                     print(f"⚠️ Failed to transform market: {e}")
@@ -147,7 +159,26 @@ class DomeClient:
             if not enriched_markets:
                 return self._empty_response()
 
-            enriched_markets.sort(key=lambda m: m['opportunity_score'], reverse=True)
+            # Filter for most relevant markets (relevance > 0.3)
+            relevant_markets = [m for m in enriched_markets if m.get('relevance_score', 0) > 0.3]
+
+            if not relevant_markets:
+                print(f"⚠️ No relevant markets found (all scored < 0.3), using all results")
+                relevant_markets = enriched_markets
+            else:
+                print(f"📊 Filtered to {len(relevant_markets)} relevant markets (out of {len(enriched_markets)})")
+
+            # Sort by opportunity score (liquidity, volume, etc.)
+            relevant_markets.sort(key=lambda m: m['opportunity_score'], reverse=True)
+
+            # Log top result for debugging
+            if relevant_markets:
+                top = relevant_markets[0]
+                print(f"🎯 Best market: {top.get('question', '?')[:80]}... "
+                      f"(relevance: {top.get('relevance_score', 0):.2f}, "
+                      f"opportunity: {top.get('opportunity_score', 0):.2f})")
+
+            enriched_markets = relevant_markets
 
             return {
                 "markets_found": enriched_markets,
@@ -157,8 +188,11 @@ class DomeClient:
             }
 
         except Exception as e:
-            print(f"❌ Error calling Dome API: {e}")
-            return self._fallback_response(project_name)
+            import traceback
+            print(f"❌ Error calling Dome API: {type(e).__name__}: {e}")
+            print(f"📋 Full traceback:\n{traceback.format_exc()}")
+            # Return empty response instead of fallback to avoid masking real errors
+            return self._empty_response()
     
     def _transform_market(self, market) -> dict:
         """
@@ -224,6 +258,47 @@ class DomeClient:
         enriched['opportunity_score'] = self._calculate_opportunity_score(enriched)
         return enriched
     
+    def _calculate_relevance(self, market: dict, project_name: str) -> float:
+        """
+        Calculate how relevant this market is to the project search (0.0 - 1.0)
+
+        Checks:
+        - Exact project name match in title/tags (high score)
+        - TGE/token/launch keywords in title (medium score)
+        - Project name in description (low score)
+        """
+        score = 0.0
+        project_lower = project_name.lower()
+
+        # Get market text fields
+        title = self._safe_get(market, 'title', '').lower()
+        tags = [str(t).lower() for t in (self._safe_get(market, 'tags', None) or [])]
+        description = self._safe_get(market, 'description', '') or ''
+        description_lower = description.lower()
+
+        # 1. Exact project name in title (0.6 points)
+        if project_lower in title:
+            score += 0.6
+
+        # 2. Project name in tags (0.3 points)
+        for tag in tags:
+            if project_lower in tag:
+                score += 0.3
+                break
+
+        # 3. TGE/token/launch keywords in title (0.2 points)
+        tge_keywords = ['tge', 'token', 'launch', 'airdrop', 'pre-market', 'token sales']
+        for keyword in tge_keywords:
+            if keyword in title:
+                score += 0.2
+                break
+
+        # 4. Project name in description (0.1 points)
+        if project_lower in description_lower:
+            score += 0.1
+
+        return min(score, 1.0)  # Cap at 1.0
+
     def _calculate_opportunity_score(self, market: Dict) -> float:
         """
         Calculate trading opportunity score (0.0 - 1.0)
