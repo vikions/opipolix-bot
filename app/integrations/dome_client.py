@@ -5,6 +5,7 @@ SDK: pip install dome-api-sdk
 """
 
 import os
+import time
 from typing import Dict, List, Optional
 from dome_api_sdk import DomeClient as DomeSDK
 
@@ -164,18 +165,22 @@ class DomeClient:
         Transform Dome API market (dict or SDK object) to our agent format.
 
         Dome market structure:
-        - market_slug, event_slug, condition_id
-        - title, description, tags
-        - volume_total, volume_1_week, volume_1_month
-        - side_a (label, id), side_b (label, id)
-        - status (open/closed), start_time, end_time
+        - market_slug: unique identifier
+        - title: question text (e.g. "Will Base launch a token by June 30, 2026?")
+        - tags: ["Crypto", "Pre-Market", "Token Sales"] etc
+        - condition_id: contract identifier
+        - start_time, end_time: unix timestamps
+        - volume_1_week, volume_1_month, volume_total: trading volume
+        - side_a, side_b: {id, label} (Yes/No options)
         """
         g = self._safe_get  # shorthand
 
         market_id = g(market, 'market_slug', '')
-        question = g(market, 'title', '')
-        description = g(market, 'description', '')
-        status = g(market, 'status', 'unknown')
+        question = g(market, 'title', '')  # e.g. "Will Base launch a token by June 30, 2026?"
+        end_time = g(market, 'end_time', None)
+        
+        # Determine if market is still open (end_time in future)
+        is_open = end_time is not None and end_time > time.time()
 
         # Volume data
         volume_total = float(g(market, 'volume_total', 0) or 0)
@@ -190,31 +195,29 @@ class DomeClient:
         side_a = self._market_to_dict(side_a_raw) if side_a_raw and not isinstance(side_a_raw, dict) else (side_a_raw or {})
         side_b = self._market_to_dict(side_b_raw) if side_b_raw and not isinstance(side_b_raw, dict) else (side_b_raw or {})
 
-        # Estimate liquidity from volume (rough proxy; real needs orderbook)
+        # Estimate liquidity from volume (rough proxy)
         estimated_liquidity = volume_total * 0.3
 
-        # Placeholder prices
+        # Placeholder prices (need orderbook for real prices)
         yes_price = 0.5
         no_price = 0.5
 
         enriched = {
             "market_id": market_id,
             "question": question,
-            "description": description,
             "liquidity": estimated_liquidity,
             "current_yes_price": yes_price,
             "current_no_price": no_price,
             "volume_24h": volume_24h,
             "volume_total": volume_total,
-            "active": status == "open",
-            "end_date": g(market, 'end_time', None),
-            "tags": g(market, 'tags', []) or [],
-            "url": f"https://polymarket.com/event/{g(market, 'event_slug', '')}/{market_id}",
+            "active": is_open,  # True if end_time > now
+            "end_date": end_time,
+            "tags": g(market, 'tags', []) or [],  # ["Crypto", "Pre-Market", "Token Sales"]
+            "url": f"https://polymarket.com/market/{market_id}",
             "dome_raw": {
                 "condition_id": g(market, 'condition_id', None),
                 "side_a_label": self._safe_get(side_a, 'label', None),
                 "side_b_label": self._safe_get(side_b, 'label', None),
-                "status": status,
             },
         }
 
