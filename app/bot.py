@@ -1,4 +1,5 @@
 import os
+import asyncio
 import requests
 from telegram import (
     Update,
@@ -763,9 +764,10 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     try:
         # Check balance via Web3
-        balance_message = check_user_balance(
-            eoa_address=wallet['eoa_address'],
-            safe_address=wallet.get('safe_address')
+        balance_message = await asyncio.to_thread(
+            check_user_balance,
+            wallet['eoa_address'],
+            wallet.get('safe_address')
         )
         
         await update.message.reply_text(
@@ -1937,3 +1939,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

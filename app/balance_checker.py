@@ -8,6 +8,7 @@ from typing import Dict
 from web3 import Web3
 from dotenv import load_dotenv
 import requests
+from integrations.dome_client import DomeClient
 
 load_dotenv()
 
@@ -90,12 +91,54 @@ class BalanceChecker:
             address=Web3.to_checksum_address(USDC_ADDRESS),
             abi=self.usdc_abi
         )
-        
         self.ctf_contract = self.w3.eth.contract(
             address=Web3.to_checksum_address(CTF_ADDRESS),
             abi=self.ctf_abi
         )
-    
+        self.token_to_market = {}
+        for market_name, outcomes in MARKET_TOKENS.items():
+            for side, token_id in outcomes.items():
+                if token_id != "TBD":
+                    self.token_to_market[str(token_id)] = (market_name, side)
+
+        self.dome_client = None
+        try:
+            self.dome_client = DomeClient()
+        except Exception as e:
+            print(f"Dome client unavailable, fallback to on-chain: {e}")
+
+    def _empty_positions(self) -> Dict[str, Dict[str, float]]:
+        return {
+            market_name: {"yes": 0.0, "no": 0.0}
+            for market_name in MARKET_TOKENS.keys()
+        }
+
+    def get_positions_via_dome(self, proxy_wallet: str) -> Dict[str, Dict[str, float]] | None:
+        """Fetch positions from Dome and map to known market token ids."""
+        if not self.dome_client:
+            return None
+
+        try:
+            positions = self._empty_positions()
+            dome_positions = self.dome_client.get_positions_by_wallet(proxy_wallet)
+
+            for pos in dome_positions:
+                token_id = str(pos.get("token_id", ""))
+                shares_raw = float(pos.get("shares", 0) or 0)
+                if shares_raw <= 0:
+                    continue
+
+                mapped = self.token_to_market.get(token_id)
+                if not mapped:
+                    continue
+
+                market_name, side = mapped
+                positions[market_name][side] = shares_raw
+
+            return positions
+        except Exception as e:
+            print(f"Dome positions failed, fallback to on-chain: {e}")
+            return None
     def get_usdc_balance(self, address: str) -> float:
        
         try:
@@ -224,20 +267,20 @@ class BalanceChecker:
             safe_usdc = self.get_usdc_balance(safe_address)
         
         total_usdc = eoa_usdc + safe_usdc
-        
-        # Positions 
-        positions = {
-            'metamask': {'yes': 0.0, 'no': 0.0},
-            'base': {'yes': 0.0, 'no': 0.0},
-            'abstract': {'yes': 0.0, 'no': 0.0},
-            'extended': {'yes': 0.0, 'no': 0.0},
-            'megaeth': {'yes': 0.0, 'no': 0.0},
-            'opinion': {'yes': 0.0, 'no': 0.0},
-            'opensea': {'yes': 0.0, 'no': 0.0},
-            'opinion_fdv': {'yes': 0.0, 'no': 0.0},
-            'opensea_fdv': {'yes': 0.0, 'no': 0.0}
-        }
-        
+        # Positions
+        positions = self._empty_positions()
+
+        if safe_address:
+            dome_positions = self.get_positions_via_dome(safe_address)
+            if dome_positions is not None:
+                return {
+                    'eoa_usdc': eoa_usdc,
+                    'safe_usdc': safe_usdc,
+                    'total_usdc': total_usdc,
+                    'positions': dome_positions,
+                    'position_source': 'dome'
+                }
+
         if safe_address:
             # Add small delay between requests to avoid rate limiting
             delay = 0.3  # 300ms between requests
@@ -590,3 +633,4 @@ def check_user_balance(eoa_address: str, safe_address: str = None) -> str:
     checker = BalanceChecker()
     balance = checker.get_full_balance(eoa_address, safe_address)
     return format_balance_message(balance)
+

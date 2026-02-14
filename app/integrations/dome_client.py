@@ -89,6 +89,80 @@ class DomeClient:
             # Re-raise to be caught by caller's error handling
             raise
 
+    def get_wallet(
+        self,
+        eoa: Optional[str] = None,
+        proxy: Optional[str] = None,
+        handle: Optional[str] = None,
+        with_metrics: bool = False,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+    ) -> Optional[Dict]:
+        """Fetch wallet metadata from Dome API using eoa, proxy, or handle."""
+        keys = [bool(eoa), bool(proxy), bool(handle)]
+        if sum(keys) != 1:
+            raise ValueError("Provide exactly one of eoa, proxy, or handle")
+
+        params: Dict[str, object] = {}
+        if eoa:
+            params["eoa"] = eoa
+        elif proxy:
+            params["proxy"] = proxy
+        else:
+            params["handle"] = handle.lstrip("@") if handle else handle
+
+        if with_metrics:
+            params["with_metrics"] = "true"
+            if start_time is not None:
+                params["start_time"] = int(start_time)
+            if end_time is not None:
+                params["end_time"] = int(end_time)
+
+        response = requests.get(
+            f"{self.base_url}/polymarket/wallet",
+            headers=self.headers,
+            params=params,
+            timeout=10,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_positions_by_wallet(self, wallet_address: str, limit: int = 100) -> List[Dict]:
+        """
+        Fetch all Polymarket positions for proxy wallet via Dome API with pagination.
+        Returns raw Dome positions payload items.
+        """
+        normalized_wallet = (wallet_address or "").lower()
+        per_page = max(1, min(int(limit or 100), 100))
+
+        all_positions: List[Dict] = []
+        pagination_key: Optional[str] = None
+
+        while True:
+            params: Dict[str, object] = {"limit": per_page}
+            if pagination_key:
+                params["pagination_key"] = pagination_key
+
+            response = requests.get(
+                f"{self.base_url}/polymarket/positions/wallet/{normalized_wallet}",
+                headers=self.headers,
+                params=params,
+                timeout=10,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            page_positions = data.get("positions", [])
+            all_positions.extend(page_positions)
+
+            pagination = data.get("pagination", {})
+            has_more = bool(pagination.get("has_more"))
+            pagination_key = pagination.get("pagination_key")
+
+            if not has_more or not pagination_key:
+                break
+
+        return all_positions
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).
@@ -400,3 +474,4 @@ class DomeClientAsync:
             project_name,
             limit,
         )
+
