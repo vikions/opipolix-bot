@@ -63,7 +63,7 @@ MARKET_TOKENS = {
 class BalanceChecker:
     
     
-    def __init__(self):
+    def __init__(self, enable_dome: bool = True):
         self.w3 = Web3(Web3.HTTPProvider(POLYGON_RPC))
         
         
@@ -102,10 +102,11 @@ class BalanceChecker:
                     self.token_to_market[str(token_id)] = (market_name, side)
 
         self.dome_client = None
-        try:
-            self.dome_client = DomeClient()
-        except Exception as e:
-            print(f"Dome client unavailable, fallback to on-chain: {e}")
+        if enable_dome:
+            try:
+                self.dome_client = DomeClient()
+            except Exception as e:
+                print(f"Dome client unavailable, fallback to on-chain: {e}")
 
     def _empty_positions(self) -> Dict[str, Dict[str, float]]:
         return {
@@ -139,18 +140,31 @@ class BalanceChecker:
         except Exception as e:
             print(f"Dome positions failed, fallback to on-chain: {e}")
             return None
-    def get_usdc_balance(self, address: str) -> float:
-       
+    def get_usdc_balance(self, address: str, retry_count: int = 3) -> float:
+        """Get USDC balance with retry logic for RPC rate limits."""
         try:
             checksum_address = Web3.to_checksum_address(address)
-            balance_wei = self.usdc_contract.functions.balanceOf(checksum_address).call()
-            
-            balance_usdc = balance_wei / 1e6
-            return balance_usdc
         except Exception as e:
-            print(f"Error getting USDC balance: {e}")
+            print(f"Error checksum address: {e}")
             return 0.0
-    
+
+        for attempt in range(retry_count):
+            try:
+                balance_wei = self.usdc_contract.functions.balanceOf(checksum_address).call()
+                return balance_wei / 1e6
+            except Exception as e:
+                error_msg = str(e).lower()
+                if ('rate limit' in error_msg or 'too many requests' in error_msg) and attempt < retry_count - 1:
+                    wait_time = 2 ** attempt  # 1s, 2s
+                    print(f"USDC rate limit hit, waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                    continue
+
+                print(f"Error getting USDC balance: {e}")
+                return 0.0
+
+        return 0.0
+
     def get_position_balance(self, address: str, token_id: str, retry_count: int = 3) -> float:
         """Get position balance with retry logic for rate limiting"""
         checksum_address = Web3.to_checksum_address(address)
@@ -408,8 +422,16 @@ def format_balance_message(balance: Dict) -> str:
     positions = balance['positions']
     has_positions = False
     
-    # Get prices for calculation
-    checker = BalanceChecker()
+    # Price lookup is optional: disabled by default to keep /balance fast.
+    if os.environ.get('BALANCE_WITH_PRICE', '0') == '1':
+        checker = BalanceChecker()
+    else:
+        class _NoPriceChecker:
+            @staticmethod
+            def get_token_price(_token_id: str) -> float:
+                return 0.0
+
+        checker = _NoPriceChecker()
     
     lines.append("*Positions:*")
     
@@ -625,6 +647,85 @@ def format_balance_message(balance: Dict) -> str:
         lines.append("  No positions yet")
     
     return "\n".join(lines)
+
+
+MARKET_DISPLAY_NAMES = {
+    "metamask": "MetaMask",
+    "base": "Base",
+    "abstract": "Abstract",
+    "extended": "Extended",
+    "megaeth": "MegaETH",
+    "opinion": "Opinion Token",
+    "opensea": "OpenSea Token",
+    "opinion_fdv": "Opinion FDV",
+    "opensea_fdv": "OpenSea FDV",
+}
+
+
+def format_usdc_only_message(balance: Dict) -> str:
+    lines = ["*USDC Balance*", ""]
+    lines.append(f"Safe: ${balance['safe_usdc']:.2f}")
+    lines.append(f"EOA: ${balance['eoa_usdc']:.2f}")
+    lines.append(f"Total: ${balance['total_usdc']:.2f}")
+    return "\n".join(lines)
+
+
+def format_positions_only_message(positions: Dict[str, Dict[str, float]]) -> str:
+    lines = ["*Positions*", ""]
+    has_positions = False
+
+    for market_key in MARKET_TOKENS.keys():
+        market_positions = positions.get(market_key, {})
+        yes_raw = float(market_positions.get("yes", 0) or 0)
+        no_raw = float(market_positions.get("no", 0) or 0)
+
+        if yes_raw <= 0 and no_raw <= 0:
+            continue
+
+        has_positions = True
+        market_name = MARKET_DISPLAY_NAMES.get(market_key, market_key.title())
+        lines.append(f"{market_name}:")
+
+        if yes_raw > 0:
+            lines.append(f"  YES: {yes_raw / 1e6:.2f} shares")
+        if no_raw > 0:
+            lines.append(f"  NO: {no_raw / 1e6:.2f} shares")
+
+        lines.append("")
+
+    if not has_positions:
+        lines.append("No positions found.")
+
+    lines.append("Source: Dome API")
+    return "\n".join(lines).strip()
+
+
+def check_user_usdc_balance(eoa_address: str, safe_address: str = None) -> str:
+    """Fast path: only fetch USDC balances."""
+    checker = BalanceChecker(enable_dome=False)
+
+    eoa_usdc = checker.get_usdc_balance(eoa_address)
+    safe_usdc = checker.get_usdc_balance(safe_address) if safe_address else 0.0
+
+    return format_usdc_only_message({
+        "eoa_usdc": eoa_usdc,
+        "safe_usdc": safe_usdc,
+        "total_usdc": eoa_usdc + safe_usdc,
+    })
+
+
+def check_user_positions_only(safe_address: str = None) -> str:
+    """Positions path: fetch only positions (Dome first, no USDC calls)."""
+    if not safe_address:
+        return "Safe wallet is not deployed yet.\nDeploy Safe first to track positions."
+
+    checker = BalanceChecker()
+    positions = checker.get_positions_via_dome(safe_address)
+
+    if positions is None:
+        return "Could not load positions from Dome API right now.\nPlease try again in a few seconds."
+
+    return format_positions_only_message(positions)
 
 
 # Helper function

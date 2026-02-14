@@ -22,7 +22,7 @@ from polymarket_client import get_polymarket_binary_prices
 
 
 from wallet_manager import WalletManager
-from balance_checker import check_user_balance
+from balance_checker import check_user_usdc_balance, check_user_positions_only
 from withdraw_manager import withdraw_usdc_from_safe
 from market_config import get_market, get_all_markets, is_market_ready
 from clob_trading import trade_market
@@ -285,6 +285,11 @@ def build_polymarket_markets_inline_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("Back to menu", callback_data="back_to_main_menu"),
         ],
     ]
+    return InlineKeyboardMarkup(rows)
+
+
+def build_balance_actions_inline_keyboard() -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("Check Positions", callback_data="balance_positions")]]
     return InlineKeyboardMarkup(rows)
 
 
@@ -744,42 +749,82 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Check user's balance
-    """
+    """Check only USDC balance and provide a button for positions."""
     telegram_id = update.message.from_user.id
-    
+
     wallet = wallet_manager.get_wallet(telegram_id)
-    
+
     if not wallet:
         await update.message.reply_text(
-            "❌ You don't have a wallet yet!\n"
-            "Press 'Trading' button to create one.",
+            "You do not have a wallet yet.\nPress 'Trading' to create one.",
             reply_markup=build_main_keyboard()
         )
         return
-    
-    # Show loading message
-    await update.message.reply_text("🔍 Checking your balance...")
-    
+
+    await update.message.reply_text("Checking USDC balance...")
+
     try:
-        # Check balance via Web3
-        balance_message = await asyncio.to_thread(
-            check_user_balance,
-            wallet['eoa_address'],
-            wallet.get('safe_address')
+        balance_message = await asyncio.wait_for(
+            asyncio.to_thread(
+                check_user_usdc_balance,
+                wallet['eoa_address'],
+                wallet.get('safe_address')
+            ),
+            timeout=20
         )
-        
+
         await update.message.reply_text(
             balance_message,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=build_balance_actions_inline_keyboard()
         )
-        
+
+    except asyncio.TimeoutError:
+        await update.message.reply_text(
+            "USDC balance check timed out due to API/RPC limits. Try again in 10-20 seconds."
+        )
+
     except Exception as e:
         await update.message.reply_text(
-            f"❌ Error checking balance: {str(e)}\n\n"
-            "Please make sure you have internet connection and try again."
+            f"Error checking balance: {str(e)}\n\nPlease try again in a few seconds."
         )
+
+
+async def handle_balance_positions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline button: check positions separately."""
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+
+    wallet = wallet_manager.get_wallet(query.from_user.id)
+    if not wallet:
+        await query.message.reply_text("Wallet not found. Open Trading first.")
+        return
+
+    safe_address = wallet.get('safe_address')
+    if not safe_address:
+        await query.message.reply_text("Safe wallet is not deployed yet. Deploy Safe first.")
+        return
+
+    await query.message.reply_text("Checking positions...")
+
+    try:
+        positions_message = await asyncio.wait_for(
+            asyncio.to_thread(check_user_positions_only, safe_address),
+            timeout=30
+        )
+
+        await query.message.reply_text(positions_message, parse_mode="Markdown")
+
+    except asyncio.TimeoutError:
+        await query.message.reply_text(
+            "Positions check timed out due to API limits. Try again in 10-20 seconds."
+        )
+
+    except Exception as e:
+        await query.message.reply_text(f"Error checking positions: {e}")
 
 
 async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1905,6 +1950,7 @@ def main():
     app.add_handler(CommandHandler("widget_pause", widget_pause_command))
     app.add_handler(CommandHandler("widget_resume", widget_resume_command))
     app.add_handler(CallbackQueryHandler(handle_widget_callback, pattern="^widget"))
+    app.add_handler(CallbackQueryHandler(handle_balance_positions_callback, pattern="^balance_positions$"))
 
     app.add_handler(
         CallbackQueryHandler(

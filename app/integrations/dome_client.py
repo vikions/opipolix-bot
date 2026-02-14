@@ -137,10 +137,26 @@ class DomeClient:
 
         all_positions: List[Dict] = []
         pagination_key: Optional[str] = None
+        seen_pagination_keys: set[str] = set()
+        max_pages = 20
+        page = 0
 
         while True:
+            if page > 0:
+                # Respect Dome rate limit (~1 request/sec) on paginated fetches.
+                time.sleep(1.05)
+
+            page += 1
+            if page > max_pages:
+                print(f"[WARN] Dome positions pagination exceeded {max_pages} pages for {normalized_wallet}, stopping early")
+                break
+
             params: Dict[str, object] = {"limit": per_page}
             if pagination_key:
+                if pagination_key in seen_pagination_keys:
+                    print(f"[WARN] Dome positions repeated pagination_key for {normalized_wallet}, stopping loop")
+                    break
+                seen_pagination_keys.add(pagination_key)
                 params["pagination_key"] = pagination_key
 
             response = requests.get(
@@ -157,10 +173,14 @@ class DomeClient:
 
             pagination = data.get("pagination", {})
             has_more = bool(pagination.get("has_more"))
-            pagination_key = pagination.get("pagination_key")
+            next_pagination_key = pagination.get("pagination_key")
 
-            if not has_more or not pagination_key:
+            if not has_more:
                 break
+            if not next_pagination_key:
+                break
+
+            pagination_key = next_pagination_key
 
         return all_positions
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
