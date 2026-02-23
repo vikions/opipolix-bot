@@ -40,6 +40,10 @@ MARKET_TOKENS = {
         "yes": "96797656031191119176188453471637044475353637081608890153571023284371119486681",
         "no": "102844052859529992637803443259193395522411387362312885030298797134413940349829"
     },
+    "tempo": {
+        "yes": "33069578092013388167178789652438366143603080812585722308466176777583824511087",
+        "no": "37064755131983123297659690046577316031263353455943638968098280164086184274144"
+    },
     "opinion": {
         "yes": "23641462641556953583022032620034685993226006023703977456530476099179630612327",
         "no": "65157140552432005096146450423766397835503038539315933132094264250643884536913"
@@ -232,6 +236,7 @@ class BalanceChecker:
             'abstract': {'yes': 0.0, 'no': 0.0},
             'extended': {'yes': 0.0, 'no': 0.0},
             'megaeth': {'yes': 0.0, 'no': 0.0},
+            'tempo': {'yes': 0.0, 'no': 0.0},
             'opinion': {'yes': 0.0, 'no': 0.0},
             'opensea': {'yes': 0.0, 'no': 0.0},
             'opinion_fdv': {'yes': 0.0, 'no': 0.0},
@@ -299,6 +304,17 @@ class BalanceChecker:
                 positions['megaeth']['no'] = self.get_position_balance(
                     safe_address,
                     MARKET_TOKENS['megaeth']['no']
+                )
+
+            # Tempo positions
+            if MARKET_TOKENS['tempo']['yes'] != 'TBD':
+                positions['tempo']['yes'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['tempo']['yes']
+                )
+                positions['tempo']['no'] = self.get_position_balance(
+                    safe_address,
+                    MARKET_TOKENS['tempo']['no']
                 )
 
             # Opinion token positions
@@ -480,6 +496,29 @@ def format_balance_message(balance: Dict) -> str:
         if megaeth_no > 0:
             shares = megaeth_no / 1e6
             price = checker.get_token_price(MARKET_TOKENS['megaeth']['no'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    NO: {shares:.2f} shares")
+
+    # Tempo
+    tempo_yes = positions['tempo']['yes']
+    tempo_no = positions['tempo']['no']
+    if tempo_yes > 0 or tempo_no > 0:
+        has_positions = True
+        lines.append("  Tempo:")
+        if tempo_yes > 0:
+            shares = tempo_yes / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['tempo']['yes'])
+            usd_value = shares * price if price > 0 else 0
+            if usd_value > 0:
+                lines.append(f"    YES: {shares:.2f} shares (~${usd_value:.2f})")
+            else:
+                lines.append(f"    YES: {shares:.2f} shares")
+        if tempo_no > 0:
+            shares = tempo_no / 1e6
+            price = checker.get_token_price(MARKET_TOKENS['tempo']['no'])
             usd_value = shares * price if price > 0 else 0
             if usd_value > 0:
                 lines.append(f"    NO: {shares:.2f} shares (~${usd_value:.2f})")

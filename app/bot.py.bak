@@ -1,5 +1,4 @@
-import os
-import logging
+﻿import os
 import requests
 from telegram import (
     Update,
@@ -75,8 +74,6 @@ from agent_handlers import show_agent_menu_message, handle_agent_input, AGENT_HA
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
-# Initialize logger
-logger = logging.getLogger(__name__)
 
 wallet_manager = WalletManager()
 
@@ -1622,7 +1619,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             token_balance = token_balance_raw / 1e6
             
-            logger.debug(f"Token balance: {token_balance_raw} raw = {token_balance} tokens")
+            print(f"ðŸ“Š Token balance: {token_balance_raw} raw = {token_balance} tokens")
             
             if token_balance <= 0:
                 await update.message.reply_text(
