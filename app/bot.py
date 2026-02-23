@@ -1,5 +1,4 @@
 import os
-import logging
 import requests
 from telegram import (
     Update,
@@ -75,8 +74,6 @@ from agent_handlers import show_agent_menu_message, handle_agent_input, AGENT_HA
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 
-# Initialize logger
-logger = logging.getLogger(__name__)
 
 wallet_manager = WalletManager()
 
@@ -86,18 +83,18 @@ db = Database()
 
 
 HELP_TEXT = (
-    "OpiPoliX Bot â€” crypto prediction market spread tracker.\n\n"
+    "OpiPoliX Bot — crypto prediction market spread tracker.\n\n"
     "Commands:\n"
-    "/start â€“ show menu and buttons\n"
-    "/help â€“ show this help\n"
-    "/about â€“ info about this bot\n"
-    "/o_markets â€“ show active Opinion markets\n"
-    "/p_markets â€“ show active Polymarket markets\n"
-    "/widget â€“ open Telegram Widget menu\n"
-    "/spread <alias> â€“ spread check (metamask / base)\n"
-    "/wallet â€“ show your trading wallet\n"
-    "/balance â€“ check your balance\n"
-    "/deploy_safe â€“ deploy Safe wallet (if not done automatically)\n\n"
+    "/start – show menu and buttons\n"
+    "/help – show this help\n"
+    "/about – info about this bot\n"
+    "/o_markets – show active Opinion markets\n"
+    "/p_markets – show active Polymarket markets\n"
+    "/widget – open Telegram Widget menu\n"
+    "/spread <alias> – spread check (metamask / base)\n"
+    "/wallet – show your trading wallet\n"
+    "/balance – check your balance\n"
+    "/deploy_safe – deploy Safe wallet (if not done automatically)\n\n"
     "Examples:\n"
     "/spread metamask\n"
     "/spread base\n"
@@ -150,18 +147,18 @@ COMMON_MARKETS = [
 ]
 
 
-BTN_SPREAD_TGE = "âœ¨ Spread TGE Tokens âœ¨"
+BTN_SPREAD_TGE = "✨ Spread TGE Tokens ✨"
 BTN_TGE_ALERTS = TGE_ALERTS_MENU_TEXT
-BTN_WIDGET = "ðŸ“Œ Telegram Widget"
+BTN_WIDGET = "📌 Telegram Widget"
 BTN_SPREAD_METAMASK = "MetaMask Spread"
 BTN_SPREAD_BASE = "Base Spread"
 BTN_OPINION = "Opinion Markets"
 BTN_POLY = "Polymarket Markets"
 BTN_ABOUT = "About Bot"
-BTN_TRADING = "ðŸ”¥ Trading"
+BTN_TRADING = "🔥 Trading"
 BTN_TRACKER = "Opinion Tracker"
-BTN_DEPLOY_SAFE = "ðŸ¦º Deploy Safe Wallet"
-BTN_MAIN_MENU = "ðŸ  Main Menu"
+BTN_DEPLOY_SAFE = "🦺 Deploy Safe Wallet"
+BTN_MAIN_MENU = "🏠 Main Menu"
 
 SPREAD_TGE_BUTTONS = [
     ("MetaMask (June 30)", "metamask"),
@@ -183,7 +180,7 @@ def format_tx_hash(tx_hash):
         if len(tx_str) > 16:
             return f"`{tx_str[:16]}...`"
         return f"`{tx_str}`"
-    return "`â€”`"
+    return "`—`"
 
 
 def get_orderbook_spread(token_id: str) -> tuple[float | None, float | None, float | None]:
@@ -225,80 +222,27 @@ def format_spread_value(spread: float | None) -> str:
         return "N/A"
     spread_cents = spread * 100
     if abs(spread_cents - round(spread_cents)) < 0.05:
-        spread_display = f"{round(spread_cents):.0f}Â¢"
+        spread_display = f"{round(spread_cents):.0f}¢"
     else:
-        spread_display = f"{spread_cents:.1f}Â¢"
+        spread_display = f"{spread_cents:.1f}¢"
     return spread_display
 
 
 def format_spread_advisory(spread: float | None) -> str:
     if spread is None:
-        return "â„¹ï¸ Spread data is unavailable right now."
+        return "ℹ️ Spread data is unavailable right now."
     spread_cents = spread * 100
     if spread_cents < 2:
-        return "âœ… Active market: market orders should have minimal slippage or spread cost."
+        return "✅ Active market: market orders should have minimal slippage or spread cost."
     if spread_cents < 3:
-        return "âš ï¸ Medium spread: you may lose a bit when opening positions with market orders."
-    return "âš ï¸ Wide spread: be careful â€” market orders can be costly."
-
-
-def _coerce_float(value: object) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(str(value).replace(",", "").strip())
-    except Exception:
-        return None
-
-
-def format_compact_volume(amount: float) -> str:
-    if amount >= 1_000_000_000:
-        return f"{amount / 1_000_000_000:.2f}B"
-    if amount >= 1_000_000:
-        return f"{amount / 1_000_000:.2f}M"
-    if amount >= 1_000:
-        return f"{amount / 1_000:.2f}K"
-    return f"{amount:.2f}"
-
-
-def get_market_volume(polymarket_id: int | None) -> float | None:
-    if not polymarket_id:
-        return None
-
-    try:
-        resp = requests.get(
-            "https://gamma-api.polymarket.com/markets",
-            params={"id": polymarket_id},
-            timeout=5,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-        if isinstance(data, list):
-            markets = data
-        elif isinstance(data, dict) and "markets" in data:
-            markets = data["markets"]
-        else:
-            return None
-
-        if not markets:
-            return None
-
-        market = markets[0]
-        for key in ("volume_total", "volumeTotal", "volume", "volume24h", "volume_24h"):
-            volume = _coerce_float(market.get(key))
-            if volume is not None:
-                return volume
-    except Exception:
-        return None
-
-    return None
+        return "⚠️ Medium spread: you may lose a bit when opening positions with market orders."
+    return "⚠️ Wide spread: be careful — market orders can be costly."
 
 
 def build_main_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton(BTN_SPREAD_TGE)],
-        [KeyboardButton("ðŸ¤– TGE Agent Mode")],
+        [KeyboardButton("🤖 TGE Agent Mode")],
         [KeyboardButton(BTN_TGE_ALERTS)],
         [KeyboardButton(BTN_WIDGET)],
         [KeyboardButton(BTN_OPINION), KeyboardButton(BTN_POLY)],
@@ -322,7 +266,7 @@ def build_spread_tge_keyboard() -> ReplyKeyboardMarkup:
 def build_opinion_markets_inline_keyboard() -> InlineKeyboardMarkup:
     rows = [
         [
-            InlineKeyboardButton("ðŸ”” Alerts", callback_data="opinion_alerts"),
+            InlineKeyboardButton("🔔 Alerts", callback_data="opinion_alerts"),
             InlineKeyboardButton("Show all", callback_data="opinion_show_all"),
         ],
         [
@@ -348,15 +292,15 @@ def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
     if safe_deployed:
         # Safe already deployed - show main buttons only
         rows = [
-            [KeyboardButton("ðŸ’° Check Balance"), KeyboardButton("ðŸ’¸ Withdraw")],
-            [KeyboardButton("ðŸŽ¯ Markets"), KeyboardButton("ðŸ“‹ Wallet Info")],
-            [KeyboardButton("ðŸ”™ Back to Main Menu")],
+            [KeyboardButton("💰 Check Balance"), KeyboardButton("💸 Withdraw")],
+            [KeyboardButton("🎯 Markets"), KeyboardButton("📋 Wallet Info")],
+            [KeyboardButton("🔙 Back to Main Menu")],
         ]
     else:
         # Safe not deployed - show deploy button
         rows = [
             [KeyboardButton(BTN_DEPLOY_SAFE)],
-            [KeyboardButton("ðŸ”™ Back to Main Menu")],
+            [KeyboardButton("🔙 Back to Main Menu")],
         ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -364,12 +308,12 @@ def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
 def build_markets_keyboard() -> ReplyKeyboardMarkup:
     """Build keyboard for market selection"""
     rows = [
-        [KeyboardButton("ðŸ¦Š MetaMask Token"), KeyboardButton("ðŸ”µ Base Token")],
-        [KeyboardButton("ðŸŽ¨ Abstract Token"), KeyboardButton("ðŸ§¬ Extended Token")],
-        [KeyboardButton("Tempo Token"), KeyboardButton("MegaETH Airdrop")],
-        [KeyboardButton("ðŸ§  Opinion Token"), KeyboardButton("ðŸŒŠ OpenSea Token")],
-        [KeyboardButton("ðŸ§ª Opinion FDV"), KeyboardButton("ðŸ’Ž Opensea FDV")],
-        [KeyboardButton("ðŸ”™ Back to Trading")],
+        [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
+        [KeyboardButton("🎨 Abstract Token"), KeyboardButton("🧬 Extended Token")],
+        [KeyboardButton("⚡ MegaETH Airdrop")],
+        [KeyboardButton("🧠 Opinion Token"), KeyboardButton("🌊 OpenSea Token")],
+        [KeyboardButton("🧪 Opinion FDV"), KeyboardButton("💎 Opensea FDV")],
+        [KeyboardButton("🔙 Back to Trading")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -377,10 +321,10 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
 def build_trade_keyboard(market_alias: str) -> ReplyKeyboardMarkup:
     """Build keyboard for trading a specific market"""
     rows = [
-        [KeyboardButton(f"ðŸ“ˆ Buy YES"), KeyboardButton(f"ðŸ“‰ Buy NO")],
-        [KeyboardButton(f"ðŸ“Š Sell YES"), KeyboardButton(f"ðŸ“Š Sell NO")],
-        [KeyboardButton("ðŸ¤– Auto-Trade"), KeyboardButton("ðŸ“Š Market Info")],
-        [KeyboardButton("ðŸ”™ Back to Markets")],
+        [KeyboardButton(f"📈 Buy YES"), KeyboardButton(f"📉 Buy NO")],
+        [KeyboardButton(f"📊 Sell YES"), KeyboardButton(f"📊 Sell NO")],
+        [KeyboardButton("🤖 Auto-Trade"), KeyboardButton("📊 Market Info")],
+        [KeyboardButton("🔙 Back to Markets")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -390,7 +334,7 @@ def build_sell_percentage_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("25%"), KeyboardButton("50%")],
         [KeyboardButton("75%"), KeyboardButton("100%")],
-        [KeyboardButton("ðŸ”™ Back to Market")],
+        [KeyboardButton("🔙 Back to Market")],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -405,31 +349,31 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = (
-        "ðŸ¤– *OpiPoliX Bot*\n\n"
+        "🤖 *OpiPoliX Bot*\n\n"
         "Designed to track spreads on hype token launch prediction markets "
         "across *Opinion* and *Polymarket*.\n\n"
-        "ðŸ’¡ Why?\n"
-        "Instead of scrolling X (Twitter) and dozens of websites â€” quickly check "
+        "💡 Why?\n"
+        "Instead of scrolling X (Twitter) and dozens of websites — quickly check "
         "real-time market sentiment directly in Telegram.\n\n"
-        "ðŸ“Š Current features:\n"
-        "â€¢ Show active markets from Opinion & Polymarket\n"
-        "â€¢ Spread analysis for MetaMask & Base token launch markets\n"
-        "â€¢ Create trading wallets with builder attribution\n"
-        "â€¢ Gasless Safe wallet deployment via Polymarket Relayer\n\n"
-        "ðŸš€ Roadmap:\n"
-        "â€¢ Add more trending token launch markets\n"
-        "â€¢ Enable real trading via bot (using API)\n"
-        "â€¢ Automatic orders on price movements\n"
+        "📊 Current features:\n"
+        "• Show active markets from Opinion & Polymarket\n"
+        "• Spread analysis for MetaMask & Base token launch markets\n"
+        "• Create trading wallets with builder attribution\n"
+        "• Gasless Safe wallet deployment via Polymarket Relayer\n\n"
+        "🚀 Roadmap:\n"
+        "• Add more trending token launch markets\n"
+        "• Enable real trading via bot (using API)\n"
+        "• Automatic orders on price movements\n"
     )
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
 async def ping(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Pong âœ…")
+    await update.message.reply_text("Pong ✅")
 
 
 async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("â³ Fetching Opinion markets (tracked list)...")
+    await update.message.reply_text("⏳ Fetching Opinion markets (tracked list)...")
     try:
         from opinion_tracked_markets import (
             get_tracked_markets,
@@ -438,7 +382,7 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
         markets = await get_tracked_markets()
         if not markets:
-            return await update.message.reply_text("âš ï¸ No tracked markets available.")
+            return await update.message.reply_text("⚠️ No tracked markets available.")
 
         message = format_tracked_markets_message(markets, limit=5)
         await update.message.reply_text(
@@ -447,7 +391,7 @@ async def o_markets(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=build_opinion_markets_inline_keyboard(),
         )
     except Exception as e:
-        await update.message.reply_text(f"âŒ Error (Opinion): {e}")
+        await update.message.reply_text(f"❌ Error (Opinion): {e}")
 
 
 async def handle_opinion_markets_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -474,7 +418,7 @@ async def handle_opinion_markets_callback(update: Update, context: ContextTypes.
 
         markets = await get_tracked_markets()
         if not markets:
-            return await query.edit_message_text("âš ï¸ No tracked markets available.")
+            return await query.edit_message_text("⚠️ No tracked markets available.")
 
         message = format_tracked_markets_message(markets)
         await query.edit_message_text(
@@ -541,11 +485,11 @@ async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     market = next((m for m in COMMON_MARKETS if m["alias"] == alias), None)
     if not market:
         return await update.message.reply_text(
-            f"ðŸš« Unknown market alias '{alias}'.\n"
+            f"🚫 Unknown market alias '{alias}'.\n"
             f"Available: {', '.join(m['alias'] for m in COMMON_MARKETS)}"
         )
 
-    await update.message.reply_text(f"â³ Checking spread for '{alias}'...")
+    await update.message.reply_text(f"⏳ Checking spread for '{alias}'...")
 
     # Opinion
     try:
@@ -564,7 +508,7 @@ async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         poly_error = str(e)
 
     lines = [
-        f"ðŸ§  Spread for '{alias}' ({market['title']})\n",
+        f"🧠 Spread for '{alias}' ({market['title']})\n",
         "Opinion:",
         f"  YES: {op_prices['yes'] if op_prices['yes'] is not None else 'N/A'}",
         f"  NO : {op_prices['no'] if op_prices['no'] is not None else 'N/A'}",
@@ -576,13 +520,13 @@ async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
     # Spread calculation
     if op_prices["yes"] is not None and poly_prices["yes"] is not None:
-        lines.append(f"Î” YES (Opinion - Polymarket): {op_prices['yes'] - poly_prices['yes']:.4f}")
+        lines.append(f"Δ YES (Opinion - Polymarket): {op_prices['yes'] - poly_prices['yes']:.4f}")
     if op_prices["no"] is not None and poly_prices["no"] is not None:
-        lines.append(f"Î” NO  (Opinion - Polymarket): {op_prices['no'] - poly_prices['no']:.4f}")
+        lines.append(f"Δ NO  (Opinion - Polymarket): {op_prices['no'] - poly_prices['no']:.4f}")
 
     # Errors if exist
     if op_error or poly_error:
-        lines.extend(["", "âš  Debug info:"])
+        lines.extend(["", "⚠ Debug info:"])
         if op_error:
             lines.append(f"  Opinion error: {op_error}")
         if poly_error:
@@ -594,7 +538,7 @@ async def _spread_for_alias(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 async def spread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
         return await update.message.reply_text(
-            "âš  Usage: /spread <alias>\nExamples:\n/spread metamask\n/spread base"
+            "⚠ Usage: /spread <alias>\nExamples:\n/spread metamask\n/spread base"
         )
     await _spread_for_alias(update, context, context.args[0])
 
@@ -614,7 +558,7 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if wallet is None:
         # ===== NEW USER - CREATE WALLET =====
         await update.message.reply_text(
-            "ðŸ”„ Creating your wallet...\n"
+            "🔄 Creating your wallet...\n"
             "This may take a few seconds..."
         )
         
@@ -623,10 +567,10 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             wallet = wallet_manager.create_wallet_for_user(telegram_id)
             
             await update.message.reply_text(
-                "âœ… EOA Wallet created!\n\n"
-                "ðŸš€ Now deploying Safe wallet...\n"
-                "â³ This may take 30-60 seconds\n"
-                "ðŸ’° Polymarket pays all gas fees!",
+                "✅ EOA Wallet created!\n\n"
+                "🚀 Now deploying Safe wallet...\n"
+                "⏳ This may take 30-60 seconds\n"
+                "💰 Polymarket pays all gas fees!",
                 parse_mode="Markdown"
             )
             
@@ -637,35 +581,35 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 # Success! Format transaction list
                 tx_lines = []
                 if result.get('safe_tx_hash'):
-                    tx_lines.append(f"â€¢ Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
+                    tx_lines.append(f"• Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
                 if result.get('usdc_tx_hash'):
-                    tx_lines.append(f"â€¢ USDC approve: {format_tx_hash(result['usdc_tx_hash'])}")
+                    tx_lines.append(f"• USDC approve: {format_tx_hash(result['usdc_tx_hash'])}")
                 if result.get('ctf_tx_hash'):
-                    tx_lines.append(f"â€¢ CTF approve: {format_tx_hash(result['ctf_tx_hash'])}")
+                    tx_lines.append(f"• CTF approve: {format_tx_hash(result['ctf_tx_hash'])}")
                 
                 tx_text = "\n".join(tx_lines) if tx_lines else "All transactions completed"
                 
                 await update.message.reply_text(
-                    "ðŸŽ‰ *Wallet Setup Complete!*\n\n"
-                    f"ðŸ¦º *Your Safe Address:*\n`{result['safe_address']}`\n\n"
-                    f"ðŸ“ Transactions:\n{tx_text}\n\n"
-                    f"âœ… *Ready to trade!*\n\n"
-                    f"ðŸ’° *Next Steps:*\n"
-                    f"1ï¸âƒ£ Send USDC to your Safe address (copy above)\n"
-                    f"2ï¸âƒ£ Use /balance to check your deposit\n"
-                    f"3ï¸âƒ£ Go to Markets and start trading!\n\n"
-                    f"âš ï¸ *IMPORTANT:*\n"
-                    f"â€¢ Only send USDC on *Polygon network*\n"
-                    f"â€¢ USDC Contract: `0x2791...4174`\n"
-                    f"â€¢ Minimum: $1 USDC per trade\n\n"
-                    f"ðŸ‘‰ Press ðŸŽ¯ Markets to start!",
+                    "🎉 *Wallet Setup Complete!*\n\n"
+                    f"🦺 *Your Safe Address:*\n`{result['safe_address']}`\n\n"
+                    f"📝 Transactions:\n{tx_text}\n\n"
+                    f"✅ *Ready to trade!*\n\n"
+                    f"💰 *Next Steps:*\n"
+                    f"1️⃣ Send USDC to your Safe address (copy above)\n"
+                    f"2️⃣ Use /balance to check your deposit\n"
+                    f"3️⃣ Go to Markets and start trading!\n\n"
+                    f"⚠️ *IMPORTANT:*\n"
+                    f"• Only send USDC on *Polygon network*\n"
+                    f"• USDC Contract: `0x2791...4174`\n"
+                    f"• Minimum: $1 USDC per trade\n\n"
+                    f"👉 Press 🎯 Markets to start!",
                     parse_mode="Markdown",
                     reply_markup=build_trading_keyboard(True)
                 )
             else:
                 # Deploy error - but EOA created
                 await update.message.reply_text(
-                    f"âš ï¸ Safe deployment failed\n\n"
+                    f"⚠️ Safe deployment failed\n\n"
                     f"Error: {result.get('error', 'Unknown')}\n\n"
                     f"Your EOA wallet is created, but Safe deployment failed.\n"
                     f"You can try again with the button below.",
@@ -674,7 +618,7 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             
         except Exception as e:
             await update.message.reply_text(
-                f"âŒ Error creating wallet: {e}\n\n"
+                f"❌ Error creating wallet: {e}\n\n"
                 "Please try again or contact support.",
                 reply_markup=build_main_keyboard()
             )
@@ -688,29 +632,29 @@ async def trading_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if wallet['safe_address']:
             # Safe deployed
             await update.message.reply_text(
-                "ðŸ’¼ *Your Trading Wallet*\n\n"
-                f"ðŸ¦º *Safe Address:*\n`{wallet['safe_address']}`\n\n"
-                f"ðŸ’° *To deposit USDC:*\n"
-                f"1ï¸âƒ£ Send USDC (Polygon) to your Safe address above\n"
-                f"2ï¸âƒ£ Use /balance to check your balance\n"
-                f"3ï¸âƒ£ Start trading!\n\n"
-                f"âš ï¸ *IMPORTANT:* Only send USDC on *Polygon network*!\n"
+                "💼 *Your Trading Wallet*\n\n"
+                f"🦺 *Safe Address:*\n`{wallet['safe_address']}`\n\n"
+                f"💰 *To deposit USDC:*\n"
+                f"1️⃣ Send USDC (Polygon) to your Safe address above\n"
+                f"2️⃣ Use /balance to check your balance\n"
+                f"3️⃣ Start trading!\n\n"
+                f"⚠️ *IMPORTANT:* Only send USDC on *Polygon network*!\n"
                 f"Contract: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`\n\n"
-                f"âœ… Ready to trade!\n\n"
-                f"ðŸ’¡ Available commands:\n"
-                f"â€¢ /balance - Check balance\n"
-                f"â€¢ /withdraw - Withdraw funds\n"
-                f"â€¢ /spread <market> - Check spreads",
+                f"✅ Ready to trade!\n\n"
+                f"💡 Available commands:\n"
+                f"• /balance - Check balance\n"
+                f"• /withdraw - Withdraw funds\n"
+                f"• /spread <market> - Check spreads",
                 parse_mode="Markdown",
                 reply_markup=build_trading_keyboard(True)
             )
         else:
             # EOA exists, but Safe not deployed
             await update.message.reply_text(
-                "ðŸ’¼ *Your Wallet Info*\n\n"
-                f"ðŸ¦º Safe Wallet: Not deployed yet\n\n"
+                "💼 *Your Wallet Info*\n\n"
+                f"🦺 Safe Wallet: Not deployed yet\n\n"
                 f"Use the button below to deploy your Safe wallet\n"
-                f"ðŸ’° Deployment is FREE (Polymarket pays gas)",
+                f"💰 Deployment is FREE (Polymarket pays gas)",
                 parse_mode="Markdown",
                 reply_markup=build_trading_keyboard(False)
             )
@@ -725,7 +669,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if not wallet:
         await update.message.reply_text(
-            "âŒ You don't have a wallet yet!\n"
+            "❌ You don't have a wallet yet!\n"
             "Press 'Trading' button to create one first.",
             reply_markup=build_main_keyboard()
         )
@@ -734,8 +678,8 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     if wallet['safe_address']:
         await update.message.reply_text(
-            f"âœ… Your Safe is already deployed!\n\n"
-            f"ðŸ¦º Safe Address:\n`{wallet['safe_address']}`\n\n"
+            f"✅ Your Safe is already deployed!\n\n"
+            f"🦺 Safe Address:\n`{wallet['safe_address']}`\n\n"
             f"You're ready to trade!",
             parse_mode="Markdown",
             reply_markup=build_trading_keyboard(True)
@@ -744,10 +688,10 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     
     await update.message.reply_text(
-        "ðŸš€ Deploying your Safe wallet...\n\n"
-        "â³ This may take 30-60 seconds\n"
-        "ðŸ’° Polymarket pays for gas!\n"
-        "ðŸŽ¯ With builder attribution!\n\n"
+        "🚀 Deploying your Safe wallet...\n\n"
+        "⏳ This may take 30-60 seconds\n"
+        "💰 Polymarket pays for gas!\n"
+        "🎯 With builder attribution!\n\n"
         "Please wait..."
     )
     
@@ -759,21 +703,21 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
             tx_lines = []
             if result.get('safe_tx_hash'):
-                tx_lines.append(f"â€¢ Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
+                tx_lines.append(f"• Safe deploy: {format_tx_hash(result['safe_tx_hash'])}")
             if result.get('usdc_tx_hash'):
-                tx_lines.append(f"â€¢ USDC approve: {format_tx_hash(result['usdc_tx_hash'])}")
+                tx_lines.append(f"• USDC approve: {format_tx_hash(result['usdc_tx_hash'])}")
             if result.get('ctf_tx_hash'):
-                tx_lines.append(f"â€¢ CTF approve: {format_tx_hash(result['ctf_tx_hash'])}")
+                tx_lines.append(f"• CTF approve: {format_tx_hash(result['ctf_tx_hash'])}")
             
             tx_text = "\n".join(tx_lines) if tx_lines else "All transactions completed"
             
             await update.message.reply_text(
-                "ðŸŽ‰ *Safe Deployed Successfully!*\n\n"
-                f"ðŸ¦º Safe Address:\n`{result['safe_address']}`\n\n"
-                f"ðŸ“ Transactions:\n{tx_text}\n\n"
-                f"ðŸ’° All gas paid by Polymarket!\n"
-                f"ðŸŽ¯ Trades attributed to OpiPoliX!\n\n"
-                f"âœ… You're ready to trade!",
+                "🎉 *Safe Deployed Successfully!*\n\n"
+                f"🦺 Safe Address:\n`{result['safe_address']}`\n\n"
+                f"📝 Transactions:\n{tx_text}\n\n"
+                f"💰 All gas paid by Polymarket!\n"
+                f"🎯 Trades attributed to OpiPoliX!\n\n"
+                f"✅ You're ready to trade!",
                 parse_mode="Markdown",
                 reply_markup=build_trading_keyboard(True)
             )
@@ -783,7 +727,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
             step = result.get('step', 'unknown')
             
             await update.message.reply_text(
-                f"âŒ Deployment failed at: {step}\n\n"
+                f"❌ Deployment failed at: {step}\n\n"
                 f"Error: {error_msg}\n\n"
                 f"Please try again in a few minutes.\n"
                 f"If the problem persists, contact support.",
@@ -792,7 +736,7 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
     except Exception as e:
         await update.message.reply_text(
-            f"âŒ Error deploying Safe: {str(e)}\n\n"
+            f"❌ Error deploying Safe: {str(e)}\n\n"
             f"Please try again or contact support.",
             reply_markup=build_trading_keyboard(False)
         )
@@ -808,14 +752,14 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     
     if not wallet:
         await update.message.reply_text(
-            "âŒ You don't have a wallet yet!\n"
+            "❌ You don't have a wallet yet!\n"
             "Press 'Trading' button to create one.",
             reply_markup=build_main_keyboard()
         )
         return
     
     # Show loading message
-    await update.message.reply_text("ðŸ” Checking your balance...")
+    await update.message.reply_text("🔍 Checking your balance...")
     
     try:
         # Check balance via Web3
@@ -831,7 +775,7 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         
     except Exception as e:
         await update.message.reply_text(
-            f"âŒ Error checking balance: {str(e)}\n\n"
+            f"❌ Error checking balance: {str(e)}\n\n"
             "Please make sure you have internet connection and try again."
         )
 
@@ -846,7 +790,7 @@ async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     if not wallet or not wallet['safe_address']:
         await update.message.reply_text(
-            "âŒ You don't have a Safe wallet yet!\n"
+            "❌ You don't have a Safe wallet yet!\n"
             "Deploy Safe wallet first.",
             reply_markup=build_main_keyboard()
         )
@@ -854,20 +798,20 @@ async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     
     # Withdrawal instructions
     await update.message.reply_text(
-        "ðŸ’¸ *Withdraw USDC*\n\n"
+        "💸 *Withdraw USDC*\n\n"
         "To withdraw, send a message in format:\n"
         "`/withdraw <amount> <address>`\n\n"
         "Examples:\n"
         "`/withdraw 10 0x742d...5aB2`\n"
         "`/withdraw 5.5 0x742d...5aB2`\n\n"
-        "âš ï¸ Make sure you have enough USDC in your Safe!",
+        "⚠️ Make sure you have enough USDC in your Safe!",
         parse_mode="Markdown"
     )
 
 
 async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    ÐšÐ¾Ð¼Ð°Ð½Ð´Ð° /withdraw <amount> <address>
+    Команда /withdraw <amount> <address>
     """
     telegram_id = update.message.from_user.id
     
@@ -875,7 +819,7 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if not wallet or not wallet['safe_address']:
         await update.message.reply_text(
-            "âŒ You don't have a Safe wallet yet!",
+            "❌ You don't have a Safe wallet yet!",
             reply_markup=build_main_keyboard()
         )
         return
@@ -883,7 +827,7 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     
     if len(context.args) < 2:
         await update.message.reply_text(
-            "âš ï¸ Usage: /withdraw <amount> <address>\n\n"
+            "⚠️ Usage: /withdraw <amount> <address>\n\n"
             "Examples:\n"
             "`/withdraw 10 0x742d...5aB2`\n"
             "`/withdraw 5.5 0x742d...5aB2`",
@@ -896,7 +840,7 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         amount = float(context.args[0])
         
         if amount <= 0:
-            await update.message.reply_text("âŒ Amount must be positive!")
+            await update.message.reply_text("❌ Amount must be positive!")
             return
         
         
@@ -904,13 +848,13 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         
         if not recipient.startswith('0x') or len(recipient) != 42:
-            await update.message.reply_text("âŒ Invalid address format!")
+            await update.message.reply_text("❌ Invalid address format!")
             return
         
         await update.message.reply_text(
-            f"ðŸ’¸ Withdrawing {amount} USDC...\n\n"
+            f"💸 Withdrawing {amount} USDC...\n\n"
             f"To: `{recipient}`\n\n"
-            "â³ Please wait...",
+            "⏳ Please wait...",
             parse_mode="Markdown"
         )
         
@@ -927,32 +871,32 @@ async def withdraw_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         
         if result['status'] == 'success':
             await update.message.reply_text(
-                f"âœ… *Withdrawal Successful!*\n\n"
-                f"ðŸ’° Amount: {amount} USDC\n"
-                f"ðŸ“ To: `{recipient}`\n\n"
-                f"ðŸ“ Transaction: `{result['tx_hash'][:16]}...`\n\n"
-                f"ðŸ”— [View on PolygonScan](https://polygonscan.com/tx/{result['tx_hash']})",
+                f"✅ *Withdrawal Successful!*\n\n"
+                f"💰 Amount: {amount} USDC\n"
+                f"📍 To: `{recipient}`\n\n"
+                f"📝 Transaction: `{result['tx_hash'][:16]}...`\n\n"
+                f"🔗 [View on PolygonScan](https://polygonscan.com/tx/{result['tx_hash']})",
                 parse_mode="Markdown"
             )
         else:
             error_msg = result.get('error', 'Unknown error')
             await update.message.reply_text(
-                f"âŒ Withdrawal failed\n\n"
+                f"❌ Withdrawal failed\n\n"
                 f"Error: {error_msg}"
             )
             
     except ValueError:
-        await update.message.reply_text("âŒ Invalid amount format! Use numbers like: 10 or 5.5")
+        await update.message.reply_text("❌ Invalid amount format! Use numbers like: 10 or 5.5")
     except Exception as e:
         await update.message.reply_text(
-            f"âŒ Error: {str(e)}\n\n"
+            f"❌ Error: {str(e)}\n\n"
             "Please try again or contact support."
         )
 
 
 async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    ÐœÐµÐ½ÑŽ Ð²Ñ‹Ð±Ð¾Ñ€Ð° Ð¼Ð°Ñ€ÐºÐµÑ‚Ð° Ð´Ð»Ñ Ñ‚Ð¾Ñ€Ð³Ð¾Ð²Ð»Ð¸
+    Меню выбора маркета для торговли
     """
     telegram_id = update.message.from_user.id
     
@@ -960,7 +904,7 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
     if not wallet or not wallet['safe_address']:
         await update.message.reply_text(
-            "âŒ You need a Safe wallet to trade!\n"
+            "❌ You need a Safe wallet to trade!\n"
             "Deploy Safe wallet first.",
             reply_markup=build_main_keyboard()
         )
@@ -968,26 +912,24 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     
    
     await update.message.reply_text(
-        "ðŸŽ¯ *Available Markets*\n\n"
-        "ðŸ¦Š *MetaMask Token by June 30, 2025*\n"
+        "🎯 *Available Markets*\n\n"
+        "🦊 *MetaMask Token by June 30, 2025*\n"
         "Will MetaMask launch a token by June 30, 2025?\n\n"
-        "ðŸ”µ *Base Token by June 30, 2026*\n"
+        "🔵 *Base Token by June 30, 2026*\n"
         "Will Base launch a token by June 30, 2026?\n\n"
-        "ðŸŽ¨ *Abstract Token by Dec 31, 2026*\n"
+        "🎨 *Abstract Token by Dec 31, 2026*\n"
         "Will Abstract launch a token by December 31, 2026?\n\n"
-        "ðŸ§¬ *Extended Token by March 31, 2026*\n"
+        "🧬 *Extended Token by March 31, 2026*\n"
         "Will Extended launch a token by March 31, 2026?\n\n"
-        "*Tempo Token by June 30, 2026*\n"
-        "Will Tempo launch a token by June 30, 2026?\n\n"
-        "âš¡ *MegaETH Airdrop by June 30*\n"
+        "⚡ *MegaETH Airdrop by June 30*\n"
         "Will MegaETH perform an airdrop by June 30?\n\n"
-        "ðŸ§  *Opinion Token by February 28, 2026*\n"
+        "🧠 *Opinion Token by February 28, 2026*\n"
         "Will Opinion launch a token by February 28, 2026?\n\n"
-        "ðŸŒŠ *OpenSea Token by March 31, 2026*\n"
+        "🌊 *OpenSea Token by March 31, 2026*\n"
         "Will OpenSea launch a token by March 31, 2026?\n\n"
-        "ðŸ§ª *Opinion FDV above $1B one day after launch?*\n"
+        "🧪 *Opinion FDV above $1B one day after launch?*\n"
         "Will FDV be above $1B one day after launch?\n\n"
-        "ðŸ’Ž *Opensea FDV above $1B one day after launch?*\n"
+        "💎 *Opensea FDV above $1B one day after launch?*\n"
         "Will Opensea FDV be above $1B one day after launch?\n\n"
         "Select a market to trade:",
         parse_mode="Markdown",
@@ -997,7 +939,7 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, market_alias: str) -> None:
     """
-    ÐœÐµÐ½ÑŽ Ñ‚Ð¾Ñ€Ð³Ð¾Ð²Ð»Ð¸ ÐºÐ¾Ð½ÐºÑ€ÐµÑ‚Ð½Ñ‹Ð¼ Ð¼Ð°Ñ€ÐºÐµÑ‚Ð¾Ð¼
+    Меню торговли конкретным маркетом
     """
     telegram_id = update.message.from_user.id
     
@@ -1005,7 +947,7 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     if not wallet or not wallet['safe_address']:
         await update.message.reply_text(
-            "âŒ You need a Safe wallet to trade!",
+            "❌ You need a Safe wallet to trade!",
             reply_markup=build_main_keyboard()
         )
         return
@@ -1013,34 +955,29 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     
     if not is_market_ready(market_alias):
         await update.message.reply_text(
-            f"âš ï¸ {market_alias.title()} market is not ready yet!\n"
+            f"⚠️ {market_alias.title()} market is not ready yet!\n"
             "Coming soon...",
             reply_markup=build_markets_keyboard()
         )
         return
     
     market = get_market(market_alias)
-    market_volume = get_market_volume(market.get("polymarket_id"))
-    volume_block = ""
-    if market_volume is not None:
-        volume_block = f"ðŸ“¦ *Volume*: ${format_compact_volume(market_volume)}\n\n"
 
     spread_yes = get_orderbook_spread(market['tokens']['yes'])[2]
     spread_block = (
-        f"ðŸ“ *Order book spread*: {format_spread_value(spread_yes)}\n"
+        f"📏 *Order book spread*: {format_spread_value(spread_yes)}\n"
         f"{format_spread_advisory(spread_yes)}\n\n"
     )
 
     await update.message.reply_text(
         f"{market['emoji']} *{market['title']}*\n\n"
-        f"ðŸ“Š Choose your action:\n\n"
-        f"ðŸ“ˆ *Buy YES* - Buy shares that it will happen\n"
-        f"ðŸ“‰ *Buy NO* - Buy shares that it won't happen\n"
-        f"ðŸ“Š *Sell* - Sell your existing shares\n\n"
-        f"{volume_block}"
+        f"📊 Choose your action:\n\n"
+        f"📈 *Buy YES* - Buy shares that it will happen\n"
+        f"📉 *Buy NO* - Buy shares that it won't happen\n"
+        f"📊 *Sell* - Sell your existing shares\n\n"
         f"{spread_block}"
-        f"ðŸ’¡ Trades are executed at market price\n"
-        f"âš¡ All transactions are gasless!",
+        f"💡 Trades are executed at market price\n"
+        f"⚡ All transactions are gasless!",
         parse_mode="Markdown",
         reply_markup=build_trade_keyboard(market_alias)
     )
@@ -1051,13 +988,13 @@ async def market_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amount: float) -> None:
     """
-    Ð’Ñ‹Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÑŒ Ñ‚Ñ€ÐµÐ¹Ð´
+    Выполнить трейд
     """
     telegram_id = update.message.from_user.id
     trade_info = context.user_data.get('pending_trade')
     
     if not trade_info:
-        await update.message.reply_text("âŒ Trade info not found")
+        await update.message.reply_text("❌ Trade info not found")
         return
     
     market_alias = trade_info['market']
@@ -1072,20 +1009,20 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
     
     if not wallet or not wallet['safe_address']:
         await update.message.reply_text(
-            "âŒ You need a Safe wallet to trade!",
+            "❌ You need a Safe wallet to trade!",
             reply_markup=build_main_keyboard()
         )
         return
     
     
-    action_emoji = "ðŸ“ˆ" if action == "buy" else "ðŸ“Š"
+    action_emoji = "📈" if action == "buy" else "📊"
     action_text = "Buying" if action == "buy" else "Selling"
     
     await update.message.reply_text(
         f"{action_emoji} {action_text} {outcome.upper()} shares...\n\n"
-        f"ðŸ’° Amount: ${amount} USDC\n"
+        f"💰 Amount: ${amount} USDC\n"
         f"{market['emoji']} {market['title']}\n\n"
-        f"â³ Please wait..."
+        f"⏳ Please wait..."
     )
     
     try:
@@ -1107,19 +1044,19 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
         
         if result['status'] == 'success':
             await update.message.reply_text(
-                f"âœ… *Trade Successful!*\n\n"
+                f"✅ *Trade Successful!*\n\n"
                 f"{action_emoji} {action_text} {outcome.upper()}\n"
-                f"ðŸ’° Amount: ${result['amount']} USDC\n\n"
-                f"ðŸŽ¯ Order ID: `{result['order_id'][:16]}...`\n\n"
-                f"âš¡ Gasless transaction!\n"
-                f"ðŸ† OpiPoliX!",
+                f"💰 Amount: ${result['amount']} USDC\n\n"
+                f"🎯 Order ID: `{result['order_id'][:16]}...`\n\n"
+                f"⚡ Gasless transaction!\n"
+                f"🏆 OpiPoliX!",
                 parse_mode="Markdown",
                 reply_markup=build_trade_keyboard(market_alias)
             )
         else:
             error_msg = result.get('error', 'Unknown error')
             await update.message.reply_text(
-                f"âŒ Trade failed\n\n"
+                f"❌ Trade failed\n\n"
                 f"Error: {error_msg}\n\n"
                 f"Please try again.",
                 reply_markup=build_trade_keyboard(market_alias)
@@ -1127,7 +1064,7 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
         
     except Exception as e:
         await update.message.reply_text(
-            f"âŒ Error: {str(e)}\n\n"
+            f"❌ Error: {str(e)}\n\n"
             f"Please try again or contact support.",
             reply_markup=build_trade_keyboard(market_alias)
         )
@@ -1138,29 +1075,29 @@ async def execute_trade(update: Update, context: ContextTypes.DEFAULT_TYPE, amou
 
 
 async def auto_trade_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, market_alias: str):
-    """ÐœÐµÐ½ÑŽ Auto-Trade Ñ Ð¾Ð¿Ð¸ÑÐ°Ð½Ð¸ÐµÐ¼"""
+    """Меню Auto-Trade с описанием"""
     market = get_market(market_alias)
     
     await update.message.reply_text(
-        f"ðŸ¤– *Auto-Trade*\n"
+        f"🤖 *Auto-Trade*\n"
         f"{market['emoji']} {market['title']}\n\n"
-        f"ðŸ’¡ *Why use Auto-Trade?*\n\n"
+        f"💡 *Why use Auto-Trade?*\n\n"
         f"When hyped tokens get listed, prices can:\n"
-        f"â€¢ ðŸš€ Pump +50-100% in minutes (real news)\n"
-        f"â€¢ ðŸ“‰ Dump -30-50% quickly (fake news)\n\n"
-        f"ðŸŽ¯ *Protect yourself with triggers:*\n\n"
-        f"ðŸ“ˆ *Auto-Buy on Pump*\n"
+        f"• 🚀 Pump +50-100% in minutes (real news)\n"
+        f"• 📉 Dump -30-50% quickly (fake news)\n\n"
+        f"🎯 *Protect yourself with triggers:*\n\n"
+        f"📈 *Auto-Buy on Pump*\n"
         f"Buy YES automatically when price jumps\n"
         f"Example: Buy $10 when price hits +10%\n\n"
-        f"ðŸ“‰ *Auto-Sell on Dump*\n"
+        f"📉 *Auto-Sell on Dump*\n"
         f"Sell YES automatically when price drops\n"
         f"Example: Sell if price drops -15%\n\n"
-        f"âš¡ *Benefits:*\n"
-        f"â€¢ No need to watch prices 24/7\n"
-        f"â€¢ React instantly to market moves\n"
-        f"â€¢ Set & forget protection\n"
-        f"â€¢ Still gasless!\n\n"
-        f"ðŸ‘‰ Choose your trigger type:",
+        f"⚡ *Benefits:*\n"
+        f"• No need to watch prices 24/7\n"
+        f"• React instantly to market moves\n"
+        f"• Set & forget protection\n"
+        f"• Still gasless!\n\n"
+        f"👉 Choose your trigger type:",
         parse_mode="Markdown",
         reply_markup=build_auto_trade_keyboard(market_alias)
     )
@@ -1223,7 +1160,7 @@ async def show_market_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ÐžÐ±Ñ€Ð°Ð±Ð¾Ñ‚Ñ‡Ð¸Ðº ÐºÐ½Ð¾Ð¿Ð¾Ðº"""
+    """Обработчик кнопок"""
     message = update.effective_message
     if not message or not message.text:
         return
@@ -1263,7 +1200,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             amount = float(text)
             
             if amount < 1:
-                await update.message.reply_text("âŒ Minimum amount is $1 USDC")
+                await update.message.reply_text("❌ Minimum amount is $1 USDC")
                 return
             
             
@@ -1277,7 +1214,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if text == BTN_WIDGET:
         return await widget_menu(update, context)
 
-    if text == "ðŸ¤– TGE Agent Mode":
+    if text == "🤖 TGE Agent Mode":
         return await show_agent_menu_message(update, context)
 
     if text == BTN_SPREAD_TGE:
@@ -1293,7 +1230,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if text == BTN_MAIN_MENU:
         await update.message.reply_text(
-            "ðŸ“± Main Menu",
+            "📱 Main Menu",
             reply_markup=build_main_keyboard(),
         )
         return
@@ -1340,7 +1277,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if text == TGE_ALERTS_BACK_TEXT:
         await update.message.reply_text(
-            "ðŸ“± Main Menu",
+            "📱 Main Menu",
             reply_markup=build_main_keyboard(),
         )
         return
@@ -1355,13 +1292,13 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         context.user_data.pop("pending_opinion_alert", None)
         return await o_markets(update, context)
     
-    if text == "âž• Add Address":
+    if text == "➕ Add Address":
         return await add_tracked_address(update, context)
     
-    if text == "ðŸ“„ My Addresses":
+    if text == "📄 My Addresses":
         return await show_tracked_addresses(update, context)
     
-    if text == "ðŸ”™ Back to Tracker":
+    if text == "🔙 Back to Tracker":
         return await opinion_tracker_menu(update, context)
     
     # Handle address input for tracker
@@ -1378,9 +1315,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             if success:
                 await update.message.reply_text(
-                    f"âœ… Address added!\n\n"
+                    f"✅ Address added!\n\n"
                     f"`{text[:10]}...{text[-8:]}`\n\n"
-                    "ðŸ” Fetching positions..."
+                    "🔍 Fetching positions..."
                 )
                 
                 # Show positions immediately
@@ -1391,104 +1328,101 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 
                 return await opinion_tracker_menu(update, context)
             else:
-                await update.message.reply_text("âŒ Error adding address. Try again.")
+                await update.message.reply_text("❌ Error adding address. Try again.")
         else:
             await update.message.reply_text(
-                "âŒ Invalid address format!\n\n"
+                "❌ Invalid address format!\n\n"
                 "Address must:\n"
-                "â€¢ Start with 0x\n"
-                "â€¢ Be 42 characters long\n\n"
-                "Try again or press ðŸ”™ Back"
+                "• Start with 0x\n"
+                "• Be 42 characters long\n\n"
+                "Try again or press 🔙 Back"
             )
         return
 
     if text == BTN_DEPLOY_SAFE:
         return await deploy_safe_wallet(update, context)
     
-    if text == "ðŸ’° Check Balance":
+    if text == "💰 Check Balance":
         return await check_balance(update, context)
     
-    if text == "ðŸ’¸ Withdraw":
+    if text == "💸 Withdraw":
         return await withdraw_funds(update, context)
     
-    if text == "ðŸŽ¯ Markets":
+    if text == "🎯 Markets":
         return await markets_menu(update, context)
     
-    if text == "ðŸ“‹ Wallet Info":
+    if text == "📋 Wallet Info":
         telegram_id = update.message.from_user.id
         wallet = wallet_manager.get_wallet(telegram_id)
         
         if not wallet or not wallet['safe_address']:
             await update.message.reply_text(
-                "âŒ You don't have a Safe wallet yet!",
+                "❌ You don't have a Safe wallet yet!",
                 reply_markup=build_main_keyboard()
             )
             return
         
         await update.message.reply_text(
-            "ðŸ’¼ *Your Trading Wallet*\n\n"
-            f"ðŸ¦º *Safe Address:*\n`{wallet['safe_address']}`\n\n"
-            f"ðŸ’° *How to Deposit USDC:*\n"
-            f"1ï¸âƒ£ Copy your Safe address above\n"
-            f"2ï¸âƒ£ Send USDC from exchange/wallet to this address\n"
-            f"3ï¸âƒ£ Select *Polygon* network (NOT Ethereum!)\n"
-            f"4ï¸âƒ£ Wait for confirmation (~30 seconds)\n"
-            f"5ï¸âƒ£ Check balance with ðŸ’° Check Balance\n\n"
-            f"âš ï¸ *IMPORTANT - READ CAREFULLY:*\n"
-            f"â€¢ Network: *Polygon* (MATIC)\n"
-            f"â€¢ Token: USDC\n"
-            f"â€¢ Contract: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`\n"
-            f"â€¢ Sending on wrong network = *FUNDS LOST*\n\n"
-            f"ðŸ‘‰ Popular exchanges with Polygon USDC:\n"
-            f"â€¢ Binance (withdraw USDC, select Polygon)\n"
-            f"â€¢ Coinbase (Bridge to Polygon)\n"
-            f"â€¢ Bybit (USDC Polygon)\n"
-            f"â€¢ OKX (USDC Polygon)\n\n"
-            f"ðŸ”— [Verify on PolygonScan](https://polygonscan.com/address/{wallet['safe_address']})",
+            "💼 *Your Trading Wallet*\n\n"
+            f"🦺 *Safe Address:*\n`{wallet['safe_address']}`\n\n"
+            f"💰 *How to Deposit USDC:*\n"
+            f"1️⃣ Copy your Safe address above\n"
+            f"2️⃣ Send USDC from exchange/wallet to this address\n"
+            f"3️⃣ Select *Polygon* network (NOT Ethereum!)\n"
+            f"4️⃣ Wait for confirmation (~30 seconds)\n"
+            f"5️⃣ Check balance with 💰 Check Balance\n\n"
+            f"⚠️ *IMPORTANT - READ CAREFULLY:*\n"
+            f"• Network: *Polygon* (MATIC)\n"
+            f"• Token: USDC\n"
+            f"• Contract: `0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`\n"
+            f"• Sending on wrong network = *FUNDS LOST*\n\n"
+            f"👉 Popular exchanges with Polygon USDC:\n"
+            f"• Binance (withdraw USDC, select Polygon)\n"
+            f"• Coinbase (Bridge to Polygon)\n"
+            f"• Bybit (USDC Polygon)\n"
+            f"• OKX (USDC Polygon)\n\n"
+            f"🔗 [Verify on PolygonScan](https://polygonscan.com/address/{wallet['safe_address']})",
             parse_mode="Markdown",
             reply_markup=build_trading_keyboard(True)
         )
         return
     
     
-    if text == "ðŸ¦Š MetaMask Token":
+    if text == "🦊 MetaMask Token":
         return await market_trade_menu(update, context, "metamask")
     
-    if text == "ðŸ”µ Base Token":
+    if text == "🔵 Base Token":
         return await market_trade_menu(update, context, "base")
     
-    if text == "ðŸŽ¨ Abstract Token":
+    if text == "🎨 Abstract Token":
         return await market_trade_menu(update, context, "abstract")
     
-    if text == "ðŸ§¬ Extended Token":
+    if text == "🧬 Extended Token":
         return await market_trade_menu(update, context, "extended")
 
-    if text == "Tempo Token":
-        return await market_trade_menu(update, context, "tempo")
-
-    if text.endswith("MegaETH Airdrop"):
+    if text == "⚡ MegaETH Airdrop":
         return await market_trade_menu(update, context, "megaeth")
 
-    if text == "ðŸ§  Opinion Token":
+    if text == "🧠 Opinion Token":
         return await market_trade_menu(update, context, "opinion")
 
-    if text == "ðŸŒŠ OpenSea Token":
+    if text == "🌊 OpenSea Token":
         return await market_trade_menu(update, context, "opensea")
 
-    if text == "ðŸ§ª Opinion FDV":
+    if text == "🧪 Opinion FDV":
         return await market_trade_menu(update, context, "opinion_fdv")
 
-    if text == "ðŸ’Ž Opensea FDV":
+    if text == "💎 Opensea FDV":
         return await market_trade_menu(update, context, "opensea_fdv")
     
     
-    if text == "ðŸ”™ Back to Trading":
+    if text == "🔙 Back to Trading":
         return await trading_menu(update, context)
     
-    if text == "ðŸ”™ Back to Markets":
+    if text == "🔙 Back to Markets":
         return await markets_menu(update, context)
     
-    if text == "ðŸ”™ Back to Market":
+    if text == "🔙 Back to Market":
         
         current_market = context.user_data.get('auto_trade_market') or context.user_data.get('current_market')
         
@@ -1498,13 +1432,13 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return await market_trade_menu(update, context, current_market)
     
     
-    if text in ["ðŸ“ˆ Buy YES", "ðŸ“‰ Buy NO", "ðŸ“Š Sell YES", "ðŸ“Š Sell NO"]:
+    if text in ["📈 Buy YES", "📉 Buy NO", "📊 Sell YES", "📊 Sell NO"]:
         
         current_market = context.user_data.get('current_market')
         
         if not current_market:
             await update.message.reply_text(
-                "âŒ Please select a market first!",
+                "❌ Please select a market first!",
                 reply_markup=build_markets_keyboard()
             )
             return
@@ -1535,8 +1469,8 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             await update.message.reply_text(
                 f"{market['emoji']} *{market['title']}*\n\n"
-                f"ðŸ“Š Sell {outcome.upper()} shares\n\n"
-                f"ðŸ“‰ Choose percentage to sell:",
+                f"📊 Sell {outcome.upper()} shares\n\n"
+                f"📉 Choose percentage to sell:",
                 parse_mode="Markdown",
                 reply_markup=build_sell_percentage_keyboard()
             )
@@ -1550,21 +1484,21 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             await update.message.reply_text(
                 f"{market['emoji']} *{market['title']}*\n\n"
-                f"ðŸ“Š Buy {outcome.upper()} shares\n\n"
-                f"ðŸ’° How much USDC do you want to spend?\n"
+                f"📊 Buy {outcome.upper()} shares\n\n"
+                f"💰 How much USDC do you want to spend?\n"
                 f"Send amount like: `10` or `5.5`\n\n"
-                f"âš ï¸ Minimum: $1 USDC",
+                f"⚠️ Minimum: $1 USDC",
                 parse_mode="Markdown"
             )
         return
     
     
-    if text == "ðŸ¤– Auto-Trade":
+    if text == "🤖 Auto-Trade":
         current_market = context.user_data.get('current_market')
         
         if not current_market:
             await update.message.reply_text(
-                "âŒ Please select a market first!",
+                "❌ Please select a market first!",
                 reply_markup=build_markets_keyboard()
             )
             return
@@ -1581,7 +1515,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         if not pending_sell:
             await update.message.reply_text(
-                "âŒ No pending sell operation",
+                "❌ No pending sell operation",
                 reply_markup=build_main_keyboard()
             )
             return
@@ -1591,7 +1525,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         
         if not wallet or not wallet['safe_address']:
             await update.message.reply_text(
-                "âŒ You need a Safe wallet to trade!",
+                "❌ You need a Safe wallet to trade!",
                 reply_markup=build_main_keyboard()
             )
             return
@@ -1604,8 +1538,8 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         token_id = market['tokens'][outcome]
         
         await update.message.reply_text(
-            f"ðŸ” Getting your {outcome.upper()} token balance...\n"
-            f"â³ Please wait..."
+            f"🔍 Getting your {outcome.upper()} token balance...\n"
+            f"⏳ Please wait..."
         )
         
         try:
@@ -1622,12 +1556,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
             token_balance = token_balance_raw / 1e6
             
-            logger.debug(f"Token balance: {token_balance_raw} raw = {token_balance} tokens")
+            print(f"📊 Token balance: {token_balance_raw} raw = {token_balance} tokens")
             
             if token_balance <= 0:
                 await update.message.reply_text(
-                    f"âŒ You have no {outcome.upper()} tokens to sell!\n\n"
-                    f"ðŸ“Š Current balance: 0",
+                    f"❌ You have no {outcome.upper()} tokens to sell!\n\n"
+                    f"📊 Current balance: 0",
                     reply_markup=build_trade_keyboard(market_alias)
                 )
                 context.user_data.pop('pending_sell', None)
@@ -1637,10 +1571,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             amount_to_sell = (token_balance * percentage) / 100
             
             await update.message.reply_text(
-                f"ðŸ“Š Selling {percentage}% of {outcome.upper()} tokens...\n\n"
-                f"ðŸ“‰ Your balance: {token_balance:.2f} tokens\n"
-                f"ðŸ’° Selling: {amount_to_sell:.2f} tokens\n\n"
-                f"â³ Please wait..."
+                f"📊 Selling {percentage}% of {outcome.upper()} tokens...\n\n"
+                f"📉 Your balance: {token_balance:.2f} tokens\n"
+                f"💰 Selling: {amount_to_sell:.2f} tokens\n\n"
+                f"⏳ Please wait..."
             )
             
            
@@ -1660,19 +1594,19 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     order_id = order_id.get('orderID', str(order_id)[:16])
                 
                 await update.message.reply_text(
-                    f"âœ… *Sell Successful!*\n\n"
-                    f"ðŸ“Š Sold {percentage}% of {outcome.upper()}\n"
-                    f"ðŸ’° Amount: {amount_to_sell:.2f} tokens\n\n"
-                    f"ðŸŽ¯ Order ID: `{str(order_id)[:16]}...`\n\n"
-                    f"âš¡ Gasless transaction!\n"
-                    f"ðŸ† OpiPoliX!",
+                    f"✅ *Sell Successful!*\n\n"
+                    f"📊 Sold {percentage}% of {outcome.upper()}\n"
+                    f"💰 Amount: {amount_to_sell:.2f} tokens\n\n"
+                    f"🎯 Order ID: `{str(order_id)[:16]}...`\n\n"
+                    f"⚡ Gasless transaction!\n"
+                    f"🏆 OpiPoliX!",
                     parse_mode="Markdown",
                     reply_markup=build_trade_keyboard(market_alias)
                 )
             else:
                 error_msg = result.get('error', 'Unknown error')
                 await update.message.reply_text(
-                    f"âŒ Sell failed\n\n"
+                    f"❌ Sell failed\n\n"
                     f"Error: {error_msg}\n\n"
                     f"Please try again.",
                     reply_markup=build_trade_keyboard(market_alias)
@@ -1680,7 +1614,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             
         except Exception as e:
             await update.message.reply_text(
-                f"âŒ Error: {str(e)}\n\n"
+                f"❌ Error: {str(e)}\n\n"
                 f"Please try again or contact support.",
                 reply_markup=build_trade_keyboard(market_alias)
             )
@@ -1692,33 +1626,33 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     
    
-    if text == "ðŸ“ˆ Buy YES on Pump":
+    if text == "📈 Buy YES on Pump":
         return await handle_auto_buy_yes_pump(update, context)
     
-    if text == "ðŸŽ­ Buy NO on Pump":
+    if text == "🎭 Buy NO on Pump":
         return await handle_auto_buy_no_pump(update, context)
     
-    if text == "ðŸ“‰ Buy NO on Dump":
+    if text == "📉 Buy NO on Dump":
         return await handle_auto_buy_no_dump(update, context)
     
-    if text == "ðŸ“Š My Active Orders":
+    if text == "📊 My Active Orders":
         return await handle_my_active_orders(update, context)
     
-    if text == "ðŸ”™ Back to Main Menu":
+    if text == "🔙 Back to Main Menu":
         await update.message.reply_text(
-            "ðŸ“± Main Menu",
+            "📱 Main Menu",
             reply_markup=build_main_keyboard()
         )
         return
     
-    if text == "ðŸ“Š Trade":
+    if text == "📊 Trade":
         await update.message.reply_text(
-            "ðŸ“Š Trading features coming soon!\n\n"
+            "📊 Trading features coming soon!\n\n"
             "You'll be able to:\n"
-            "â€¢ Place market orders\n"
-            "â€¢ Set limit orders\n"
-            "â€¢ Create auto-orders on price movements\n\n"
-            "Stay tuned! ðŸš€"
+            "• Place market orders\n"
+            "• Set limit orders\n"
+            "• Create auto-orders on price movements\n\n"
+            "Stay tuned! 🚀"
         )
         return
     
@@ -1845,12 +1779,12 @@ async def add_tracked_address(update: Update, context: ContextTypes.DEFAULT_TYPE
     context.user_data['awaiting_tracker_address'] = True
     
     await update.message.reply_text(
-        "ðŸ“ *Add Opinion Address*\n\n"
+        "📝 *Add Opinion Address*\n\n"
         "Send me the wallet address you want to track\n"
         "(BNB Chain / BSC address)\n\n"
         "Example:\n"
         "`0xF3330Aa51fE6fC9Eb5E20f115604c82569f4C30b`\n\n"
-        "Or press ðŸ”™ Back to cancel",
+        "Or press 🔙 Back to cancel",
         parse_mode="Markdown"
     )
 
@@ -1866,20 +1800,20 @@ async def show_tracked_addresses(update: Update, context: ContextTypes.DEFAULT_T
     
     if not tracked:
         keyboard = [
-            [KeyboardButton("âž• Add Address")],
-            [KeyboardButton("ðŸ”™ Back to Tracker")],
+            [KeyboardButton("➕ Add Address")],
+            [KeyboardButton("🔙 Back to Tracker")],
         ]
         
         await update.message.reply_text(
-            "ðŸ“„ *My Tracked Addresses*\n\n"
+            "📄 *My Tracked Addresses*\n\n"
             "You're not tracking any addresses yet.\n\n"
-            "Press âž• Add Address to start!",
+            "Press ➕ Add Address to start!",
             parse_mode="Markdown",
             reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         )
         return
     
-    message = "ðŸ“„ *My Tracked Addresses*\n\n"
+    message = "📄 *My Tracked Addresses*\n\n"
     
     for idx, addr in enumerate(tracked):
         address = addr['address']
@@ -1888,11 +1822,11 @@ async def show_tracked_addresses(update: Update, context: ContextTypes.DEFAULT_T
         message += f"{idx + 1}. *{nickname}*\n"
         message += f"   `{address[:10]}...{address[-8:]}`\n\n"
     
-    message += "\nðŸ‘‰ Send me an address to view its positions!"
+    message += "\n👉 Send me an address to view its positions!"
     
     keyboard = [
-        [KeyboardButton("âž• Add Address")],
-        [KeyboardButton("ðŸ”™ Back to Tracker")],
+        [KeyboardButton("➕ Add Address")],
+        [KeyboardButton("🔙 Back to Tracker")],
     ]
     
     await update.message.reply_text(
@@ -1907,8 +1841,8 @@ async def show_address_positions(update: Update, context: ContextTypes.DEFAULT_T
     from opinion_tracker import get_user_positions, get_user_balances, format_positions_message, format_balances_message
     
     await update.message.reply_text(
-        f"ðŸ” Fetching data for `{address[:10]}...{address[-8:]}`\n\n"
-        "â³ Please wait...",
+        f"🔍 Fetching data for `{address[:10]}...{address[-8:]}`\n\n"
+        "⏳ Please wait...",
         parse_mode="Markdown"
     )
     
@@ -2003,7 +1937,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
