@@ -82,6 +82,22 @@ MARKETS = {
         "polymarket_id": 556108,
         "slug": "will-megaeth-perform-an-airdrop-by-june-30-143-229-513-574-212-254"
     },
+    "tempo": {
+        "title": "Tempo Token by June 30, 2026",
+        "condition_id": "0x23862cc33d499e4f93c0fba6e64a4db04d4a83ac5f180458e3d13b97cb9c78d0",
+        "question_id": "0x23862cc33d499e4f93c0fba6e64a4db04d4a83ac5f180458e3d13b97cb9c78d0",
+        "tokens": {
+            "yes": "33069578092013388167178789652438366143603080812585722308466176777583824511087",
+            "no": "37064755131983123297659690046577316031263353455943638968098280164086184274144"
+        },
+        "clob_token_ids": {
+            "yes": "33069578092013388167178789652438366143603080812585722308466176777583824511087",
+            "no": "37064755131983123297659690046577316031263353455943638968098280164086184274144"
+        },
+        "emoji": "🎵",
+        "polymarket_id": 704346,
+        "slug": "will-tempo-launch-a-token-by-june-30-2026"
+    },
     "opinion": {
         "title": "Opinion Token by February 28, 2026",
         "condition_id": "0xb315c9af354537c361bb137e5a62be8d431999d8d8d7354de802a0e3cdbaa66b",

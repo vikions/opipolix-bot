@@ -89,6 +89,60 @@ class DomeClient:
             # Re-raise to be caught by caller's error handling
             raise
 
+    def get_positions_by_wallet(self, wallet_address: str, limit: int = 100) -> List[Dict]:
+        """Fetch all Polymarket positions for wallet via Dome API with pagination."""
+        normalized_wallet = (wallet_address or "").lower()
+        per_page = max(1, min(int(limit or 100), 100))
+
+        all_positions: List[Dict] = []
+        pagination_key: Optional[str] = None
+        seen_pagination_keys: set[str] = set()
+        max_pages = 20
+        page = 0
+
+        while True:
+            if page > 0:
+                # Dome allows around 1 request/sec on this endpoint.
+                time.sleep(1.05)
+
+            page += 1
+            if page > max_pages:
+                print(f"[WARN] Dome positions pagination exceeded {max_pages} pages for {normalized_wallet}, stopping early")
+                break
+
+            params: Dict[str, object] = {"limit": per_page}
+            if pagination_key:
+                if pagination_key in seen_pagination_keys:
+                    print(f"[WARN] Dome positions repeated pagination_key for {normalized_wallet}, stopping loop")
+                    break
+                seen_pagination_keys.add(pagination_key)
+                params["pagination_key"] = pagination_key
+
+            response = requests.get(
+                f"{self.base_url}/polymarket/positions/wallet/{normalized_wallet}",
+                headers=self.headers,
+                params=params,
+                timeout=10,
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            page_positions = data.get("positions", [])
+            all_positions.extend(page_positions)
+
+            pagination = data.get("pagination", {})
+            has_more = bool(pagination.get("has_more"))
+            next_pagination_key = pagination.get("pagination_key")
+
+            if not has_more:
+                break
+            if not next_pagination_key:
+                break
+
+            pagination_key = next_pagination_key
+
+        return all_positions
+
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).

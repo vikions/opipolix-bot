@@ -1,4 +1,5 @@
 import os
+import asyncio
 import requests
 from telegram import (
     Update,
@@ -21,7 +22,7 @@ from polymarket_client import get_polymarket_binary_prices
 
 
 from wallet_manager import WalletManager
-from balance_checker import check_user_balance
+from balance_checker import check_user_usdc_balance, check_user_positions_only
 from withdraw_manager import withdraw_usdc_from_safe
 from market_config import get_market, get_all_markets, is_market_ready
 from clob_trading import trade_market
@@ -287,6 +288,11 @@ def build_polymarket_markets_inline_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def build_balance_actions_inline_keyboard() -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton("Check Positions", callback_data="balance_positions")]]
+    return InlineKeyboardMarkup(rows)
+
+
 def build_trading_keyboard(safe_deployed: bool) -> ReplyKeyboardMarkup:
     """Build keyboard for Trading menu"""
     if safe_deployed:
@@ -310,7 +316,7 @@ def build_markets_keyboard() -> ReplyKeyboardMarkup:
     rows = [
         [KeyboardButton("🦊 MetaMask Token"), KeyboardButton("🔵 Base Token")],
         [KeyboardButton("🎨 Abstract Token"), KeyboardButton("🧬 Extended Token")],
-        [KeyboardButton("⚡ MegaETH Airdrop")],
+        [KeyboardButton("Tempo Token"), KeyboardButton("⚡ MegaETH Airdrop")],
         [KeyboardButton("🧠 Opinion Token"), KeyboardButton("🌊 OpenSea Token")],
         [KeyboardButton("🧪 Opinion FDV"), KeyboardButton("💎 Opensea FDV")],
         [KeyboardButton("🔙 Back to Trading")],
@@ -743,13 +749,11 @@ async def deploy_safe_wallet(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Check user's balance
-    """
+    """Check USDC balance and provide a separate positions check action."""
     telegram_id = update.message.from_user.id
-    
+
     wallet = wallet_manager.get_wallet(telegram_id)
-    
+
     if not wallet:
         await update.message.reply_text(
             "❌ You don't have a wallet yet!\n"
@@ -757,27 +761,70 @@ async def check_balance(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             reply_markup=build_main_keyboard()
         )
         return
-    
-    # Show loading message
-    await update.message.reply_text("🔍 Checking your balance...")
-    
+
+    await update.message.reply_text("🔍 Checking USDC balance...")
+
     try:
-        # Check balance via Web3
-        balance_message = check_user_balance(
-            eoa_address=wallet['eoa_address'],
-            safe_address=wallet.get('safe_address')
+        balance_message = await asyncio.wait_for(
+            asyncio.to_thread(
+                check_user_usdc_balance,
+                wallet['eoa_address'],
+                wallet.get('safe_address')
+            ),
+            timeout=20
         )
-        
+
         await update.message.reply_text(
             balance_message,
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=build_balance_actions_inline_keyboard()
         )
-        
+
+    except asyncio.TimeoutError:
+        await update.message.reply_text(
+            "⚠️ USDC balance check timed out due to API/RPC limits. Try again in 10-20 seconds."
+        )
+
     except Exception as e:
         await update.message.reply_text(
             f"❌ Error checking balance: {str(e)}\n\n"
-            "Please make sure you have internet connection and try again."
+            "Please try again in a few seconds."
         )
+
+
+async def handle_balance_positions_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline button to fetch positions separately via Dome API."""
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+
+    wallet = wallet_manager.get_wallet(query.from_user.id)
+    if not wallet:
+        await query.message.reply_text("❌ Wallet not found. Open Trading first.")
+        return
+
+    safe_address = wallet.get('safe_address')
+    if not safe_address:
+        await query.message.reply_text("❌ Safe wallet is not deployed yet. Deploy Safe first.")
+        return
+
+    await query.message.reply_text("🔍 Checking positions...")
+
+    try:
+        positions_message = await asyncio.wait_for(
+            asyncio.to_thread(check_user_positions_only, safe_address),
+            timeout=30
+        )
+        await query.message.reply_text(positions_message, parse_mode="Markdown")
+
+    except asyncio.TimeoutError:
+        await query.message.reply_text(
+            "⚠️ Positions check timed out due to API limits. Try again in 10-20 seconds."
+        )
+    except Exception as e:
+        await query.message.reply_text(f"❌ Error checking positions: {e}")
 
 
 async def withdraw_funds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -921,6 +968,8 @@ async def markets_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "Will Abstract launch a token by December 31, 2026?\n\n"
         "🧬 *Extended Token by March 31, 2026*\n"
         "Will Extended launch a token by March 31, 2026?\n\n"
+        "*Tempo Token by June 30, 2026*\n"
+        "Will Tempo launch a token by June 30, 2026?\n\n"
         "⚡ *MegaETH Airdrop by June 30*\n"
         "Will MegaETH perform an airdrop by June 30?\n\n"
         "🧠 *Opinion Token by February 28, 2026*\n"
@@ -1402,6 +1451,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if text == "⚡ MegaETH Airdrop":
         return await market_trade_menu(update, context, "megaeth")
+
+    if text == "Tempo Token":
+        return await market_trade_menu(update, context, "tempo")
 
     if text == "🧠 Opinion Token":
         return await market_trade_menu(update, context, "opinion")
@@ -1903,6 +1955,7 @@ def main():
     app.add_handler(CommandHandler("widget_pause", widget_pause_command))
     app.add_handler(CommandHandler("widget_resume", widget_resume_command))
     app.add_handler(CallbackQueryHandler(handle_widget_callback, pattern="^widget"))
+    app.add_handler(CallbackQueryHandler(handle_balance_positions_callback, pattern="^balance_positions$"))
 
     app.add_handler(
         CallbackQueryHandler(
