@@ -166,8 +166,8 @@ class BalanceChecker:
                     time.sleep(wait_time)
                     continue
 
-            print(f"Error getting USDC balance: {e}")
-            return 0.0
+                print(f"Error getting USDC balance: {e}")
+                return 0.0
 
         return 0.0
     
