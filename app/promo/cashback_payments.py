@@ -6,7 +6,7 @@ from eth_account import Account
 import os
 
 
-POLYGON_RPC = os.environ.get("POLYGON_RPC", "https://polygon-rpc.com")
+POLYGON_RPC = os.environ.get("POLY_RPC_URL") or os.environ.get("POLYGON_RPC", "https://polygon-rpc.com")
 USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
 
 # Your personal wallet to send cashback FROM

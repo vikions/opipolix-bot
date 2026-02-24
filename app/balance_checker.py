@@ -12,8 +12,8 @@ from integrations.dome_client import DomeClient
 
 load_dotenv()
 
-# Polygon RPC
-POLYGON_RPC = os.environ.get("POLYGON_RPC", "https://polygon-rpc.com")
+# Polygon RPC (prefer POLY_RPC_URL, keep POLYGON_RPC for backward compatibility)
+POLYGON_RPC = os.environ.get("POLY_RPC_URL") or os.environ.get("POLYGON_RPC", "https://polygon-rpc.com")
 
 # Contract addresses (Polygon Mainnet)
 USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
