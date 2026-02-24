@@ -662,11 +662,8 @@ MARKET_DISPLAY_NAMES = {
 
 
 def format_usdc_only_message(balance: Dict) -> str:
-    lines = ["*USDC Balance*", ""]
-    lines.append(f"Safe: ${balance['safe_usdc']:.2f}")
-    lines.append(f"EOA: ${balance['eoa_usdc']:.2f}")
-    lines.append(f"Total: ${balance['total_usdc']:.2f}")
-    return "\n".join(lines)
+    total_usdc = float(balance.get("total_usdc", 0) or 0)
+    return f"💰 *USDC Balance*\n\n💵 ${total_usdc:.2f}"
 
 
 def format_positions_only_message(positions: Dict[str, Dict[str, float]]) -> str:
