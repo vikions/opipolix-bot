@@ -181,27 +181,27 @@ DISCORD_TOKEN=your_discord_token
 
 ```
 opipolix-bot/
-??? app/
-?   ??? bot.py                    # Main Telegram bot
-?   ??? auto_trade_worker.py      # Background price monitor
-?   ??? auto_trade_handlers.py    # Auto-trade UI handlers
-?   ??? auto_trade_manager.py     # Order management
-?   ??? price_monitor.py          # Price tracking logic
-?   ??? clob_trading.py           # Trading execution
-?   ??? wallet_manager.py         # Wallet creation & Safe deployment
-?   ??? database.py               # PostgreSQL interface
-?   ??? market_config.py          # Market definitions
-?   ??? opinion_tracked_markets.py
-?   ??? polymarket_tracked_markets.py
-?   ??? opinion_alert_handlers.py
-?   ??? tge_alert_handlers.py
-?   ??? opinion_tracker.py
-?   ??? widget_worker.py          # Pinned widget updates
-?   ??? ...
-??? start.py                      # Production runner (bot + worker)
-??? requirements.txt              # Python dependencies
-??? Procfile                      # Railway deployment config
-??? README.md                     # This file
+|-- app/
+|   |-- bot.py                    # Main Telegram bot
+|   |-- auto_trade_worker.py      # Background price monitor
+|   |-- auto_trade_handlers.py    # Auto-trade UI handlers
+|   |-- auto_trade_manager.py     # Order management
+|   |-- price_monitor.py          # Price tracking logic
+|   |-- clob_trading.py           # Trading execution
+|   |-- wallet_manager.py         # Wallet creation & Safe deployment
+|   |-- database.py               # PostgreSQL interface
+|   |-- market_config.py          # Market definitions
+|   |-- opinion_tracked_markets.py
+|   |-- polymarket_tracked_markets.py
+|   |-- opinion_alert_handlers.py
+|   |-- tge_alert_handlers.py
+|   |-- opinion_tracker.py
+|   |-- widget_worker.py          # Pinned widget updates
+|   `-- ...
+|-- start.py                      # Production runner (bot + worker)
+|-- requirements.txt              # Python dependencies
+|-- Procfile                      # Railway deployment config
+`-- README.md                     # This file
 ```
 
 ---
