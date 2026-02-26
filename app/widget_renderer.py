@@ -19,7 +19,7 @@ KNOWN_ALIAS_BY_ALIAS = {
 
 KNOWN_ALIAS_BY_TITLE = {
     "opensea token by march 31, 2026": "OpenS",
-    "opinion token by february 17, 2026": "Opin",
+    "opinion token by march 31, 2026": "Opin",
     "metamask token by june 30": "MetaM",
     "base token by june 30, 2026": "Base",
     "abstract token by dec 31, 2026": "Abst",
