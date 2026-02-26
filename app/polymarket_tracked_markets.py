@@ -188,7 +188,13 @@ def _fetch_market_sync(market_id: int) -> Optional[Dict]:
     market = markets[0]
     title = market.get("question") or market.get("title") or market.get("name")
     slug = market.get("slug")
-    volume_raw = market.get("volume24h") or market.get("volume_24h") or market.get("volume")
+    # Use explicit 24h fields only; do not fallback to total volume.
+    volume_raw = (
+        market.get("volume24hrClob")
+        or market.get("volume24hr")
+        or market.get("volume24h")
+        or market.get("volume_24h")
+    )
     volume24h = _coerce_float(volume_raw, default=0.0)
     yes_price, no_price = _parse_prices(market)
     yes_pct = int(round(yes_price * 100)) if yes_price is not None else None
