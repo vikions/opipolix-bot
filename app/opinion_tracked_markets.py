@@ -73,7 +73,7 @@ _DATE_WITHOUT_COMMA = re.compile(
 )
 
 INTRO_TEXT = (
-    "Hottest token-launch markets on Opinion right now (ranked by 24h volume)."
+    "Hottest token-launch markets on Opinion right now (ranked by volume)."
 )
 
 
@@ -377,7 +377,7 @@ def format_tracked_markets_message(markets: List[Dict], limit: Optional[int] = N
         vol_display = format_volume(market.get("volume24h", 0.0))
         orders = market.get("orders")
         orders_display = str(orders) if isinstance(orders, int) else "\u2014"
-        vol_label = f"{VOLUME_EMOJI} Vol 24h" if USE_EMOJI else "Vol 24h"
+        vol_label = f"{VOLUME_EMOJI} Vol" if USE_EMOJI else "Vol"
         lines.append(f"   {vol_label}: ${vol_display} | {orders_display} orders")
         lines.append("")
 

@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://gamma-api.polymarket.com"
 REQUEST_TIMEOUT_SEC = 10.0
 SEPARATOR_LINE = "------------------------------"
+USE_EMOJI = True
+
+HEADER_EMOJI = "\U0001F525"
+INTRO_EMOJI = "\U0001F4C8"
+RANK_EMOJI = "\U0001F4CC"
+VOLUME_EMOJI = "\U0001F4B0"
+
+INTRO_TEXT = "Top tracked Polymarket markets ranked by volume."
 
 ALIASES_FROM_CONFIG = ["base", "metamask", "abstract", "extended", "megaeth", "opinion", "opensea"]
 
@@ -292,15 +300,27 @@ def format_volume(amount: float) -> str:
 def format_tracked_markets_message(markets: List[Dict], limit: Optional[int] = None) -> str:
     shown = markets if limit is None else markets[:limit]
 
+    header = (
+        f"{HEADER_EMOJI} POLYMARKET MARKETS (Tracked Token Launch Markets)"
+        if USE_EMOJI
+        else "POLYMARKET MARKETS (Tracked Token Launch Markets)"
+    )
+    intro = (
+        f"{INTRO_EMOJI} {INTRO_TEXT}"
+        if USE_EMOJI
+        else INTRO_TEXT
+    )
+
     lines = [
-        "POLYMARKET MARKETS (Tracked Token Launch Markets)",
+        header,
         SEPARATOR_LINE,
-        "Top tracked Polymarket markets ranked by 24h volume.",
+        intro,
         "",
     ]
 
     for idx, market in enumerate(shown, 1):
-        lines.append(f"{idx}. {market['title']}")
+        prefix = f"{RANK_EMOJI} {idx}." if USE_EMOJI else f"{idx})"
+        lines.append(f"{prefix} {market['title']}")
 
         yes_price = market.get("yes_price")
         no_price = market.get("no_price")
@@ -314,7 +334,8 @@ def format_tracked_markets_message(markets: List[Dict], limit: Optional[int] = N
             )
 
         vol_display = format_volume(market.get("volume24h", 0.0))
-        lines.append(f"   Vol 24h: ${vol_display}")
+        vol_label = f"{VOLUME_EMOJI} Vol" if USE_EMOJI else "Vol"
+        lines.append(f"   {vol_label}: ${vol_display}")
         lines.append("")
 
     return "\n".join(lines).rstrip()
