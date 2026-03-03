@@ -143,6 +143,85 @@ class DomeClient:
 
         return all_positions
 
+    @staticmethod
+    def _coerce_price(value: object) -> Optional[float]:
+        """Convert API value to price in [0, 1] range."""
+        if value is None:
+            return None
+        try:
+            numeric = float(str(value).replace(",", "").strip())
+        except Exception:
+            return None
+
+        if numeric < 0:
+            return None
+        if numeric <= 1:
+            return numeric
+        if numeric <= 100:
+            # Some APIs may return cents (e.g. 63 instead of 0.63)
+            return numeric / 100.0
+        return None
+
+    def _extract_price_from_payload(self, payload: object) -> Optional[float]:
+        """Best-effort extraction of token price from Dome JSON payload."""
+        candidate_keys = (
+            "price",
+            "current_price",
+            "currentPrice",
+            "yes_price",
+            "yesPrice",
+            "best_ask",
+            "bestAsk",
+            "mid_price",
+            "midPrice",
+        )
+
+        def walk(node: object) -> Optional[float]:
+            if isinstance(node, dict):
+                for key in candidate_keys:
+                    if key in node:
+                        parsed = self._coerce_price(node.get(key))
+                        if parsed is not None:
+                            return parsed
+
+                for value in node.values():
+                    parsed = walk(value)
+                    if parsed is not None:
+                        return parsed
+
+            if isinstance(node, list):
+                for item in node:
+                    parsed = walk(item)
+                    if parsed is not None:
+                        return parsed
+
+            return None
+
+        return walk(payload)
+
+    def get_market_price(self, market_id: str) -> Optional[float]:
+        """Fetch current price for a Polymarket outcome token from Dome."""
+        market_id_value = str(market_id or "").strip()
+        if not market_id_value:
+            return None
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/polymarket/market-price/{market_id_value}",
+                headers=self.headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[WARN] Dome market-price request failed for {market_id_value}: {e}")
+            return None
+        except Exception as e:
+            print(f"[WARN] Dome market-price parse failed for {market_id_value}: {e}")
+            return None
+
+        return self._extract_price_from_payload(payload)
+
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).

@@ -4,7 +4,7 @@ Balance Checker для OpiPoliX бота
 """
 import os
 import time
-from typing import Dict
+from typing import Dict, Optional
 from web3 import Web3
 from dotenv import load_dotenv
 import requests
@@ -104,6 +104,7 @@ class BalanceChecker:
                     self.token_to_market[str(token_id)] = (market_name, side)
 
         self.dome_client = None
+        self._dome_price_cache: Dict[str, Optional[float]] = {}
         if enable_dome:
             try:
                 self.dome_client = DomeClient()
@@ -126,8 +127,18 @@ class BalanceChecker:
             dome_positions = self.dome_client.get_positions_by_wallet(proxy_wallet)
 
             for pos in dome_positions:
-                token_id = str(pos.get("token_id", ""))
-                shares_raw = float(pos.get("shares", 0) or 0)
+                token_id = str(
+                    pos.get("token_id")
+                    or pos.get("tokenId")
+                    or pos.get("asset_id")
+                    or ""
+                )
+                shares_raw = float(
+                    pos.get("shares")
+                    or pos.get("size")
+                    or pos.get("amount")
+                    or 0
+                )
                 if shares_raw <= 0:
                     continue
 
@@ -136,12 +147,81 @@ class BalanceChecker:
                     continue
 
                 market_name, side = mapped
-                positions[market_name][side] = shares_raw
+                positions[market_name][side] += shares_raw
 
             return positions
         except Exception as e:
             print(f"Dome positions failed, fallback to on-chain: {e}")
             return None
+
+    def get_token_price_via_dome(self, token_id: str) -> Optional[float]:
+        """Get token price from Dome market-price endpoint with local cache."""
+        token_key = str(token_id or "").strip()
+        if not token_key:
+            return None
+
+        if token_key in self._dome_price_cache:
+            return self._dome_price_cache[token_key]
+
+        if not self.dome_client:
+            self._dome_price_cache[token_key] = None
+            return None
+
+        try:
+            price = self.dome_client.get_market_price(token_key)
+        except Exception as e:
+            print(f"Error getting Dome price for {token_key}: {e}")
+            price = None
+
+        if price is not None and price < 0:
+            price = None
+
+        self._dome_price_cache[token_key] = price
+        return price
+
+    def get_positions_snapshot_via_dome(self, proxy_wallet: str) -> Dict | None:
+        """
+        Fetch positions via Dome and estimate USD values using Dome market-price.
+        """
+        positions = self.get_positions_via_dome(proxy_wallet)
+        if positions is None:
+            return None
+
+        usd_values = self._empty_positions()
+        total_usd = 0.0
+        outcomes_with_position = 0
+        outcomes_with_price = 0
+
+        for market_name, market_positions in positions.items():
+            for side in ("yes", "no"):
+                raw_shares = float(market_positions.get(side, 0) or 0)
+                if raw_shares <= 0:
+                    continue
+
+                outcomes_with_position += 1
+                shares = raw_shares / 1e6
+
+                token_id = MARKET_TOKENS.get(market_name, {}).get(side)
+                if not token_id or token_id == "TBD":
+                    continue
+
+                price = self.get_token_price_via_dome(token_id)
+                if price is None:
+                    continue
+
+                usd_value = shares * price
+                usd_values[market_name][side] = usd_value
+                total_usd += usd_value
+                outcomes_with_price += 1
+
+        return {
+            "positions": positions,
+            "usd_values": usd_values,
+            "total_usd": total_usd,
+            "outcomes_with_position": outcomes_with_position,
+            "outcomes_with_price": outcomes_with_price,
+            "price_source": "dome_market_price",
+        }
 
     def get_usdc_balance(self, address: str, retry_count: int = 3) -> float:
         """Get USDC balance with retry logic for RPC rate limits."""
@@ -666,7 +746,13 @@ def format_usdc_only_message(balance: Dict) -> str:
     return f"💰 *USDC Balance*\n\n💵 ${total_usdc:.2f}"
 
 
-def format_positions_only_message(positions: Dict[str, Dict[str, float]]) -> str:
+def format_positions_only_message(data: Dict) -> str:
+    positions = data.get("positions", data)
+    usd_values = data.get("usd_values", {})
+    total_usd = float(data.get("total_usd", 0) or 0)
+    outcomes_with_position = int(data.get("outcomes_with_position", 0) or 0)
+    outcomes_with_price = int(data.get("outcomes_with_price", 0) or 0)
+
     lines = ["*Positions*", ""]
     has_positions = False
 
@@ -682,13 +768,29 @@ def format_positions_only_message(positions: Dict[str, Dict[str, float]]) -> str
         market_name = MARKET_DISPLAY_NAMES.get(market_key, market_key.title())
         lines.append(f"{market_name}:")
         if yes_raw > 0:
-            lines.append(f"  YES: {yes_raw / 1e6:.2f} shares")
+            yes_usd = float(usd_values.get(market_key, {}).get("yes", 0) or 0)
+            if yes_usd > 0:
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares (~${yes_usd:.2f})")
+            else:
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares")
         if no_raw > 0:
-            lines.append(f"  NO: {no_raw / 1e6:.2f} shares")
+            no_usd = float(usd_values.get(market_key, {}).get("no", 0) or 0)
+            if no_usd > 0:
+                lines.append(f"  NO: {no_raw / 1e6:.2f} shares (~${no_usd:.2f})")
+            else:
+                lines.append(f"  NO: {no_raw / 1e6:.2f} shares")
         lines.append("")
 
     if not has_positions:
         lines.append("No positions found.")
+    elif outcomes_with_price > 0:
+        lines.append(f"Estimated value: ${total_usd:.2f}")
+        if outcomes_with_price < outcomes_with_position:
+            lines.append(
+                f"Priced outcomes: {outcomes_with_price}/{outcomes_with_position}"
+            )
+    elif outcomes_with_position > 0:
+        lines.append("USD valuation is temporarily unavailable.")
 
     lines.append("Source: Dome API")
     return "\n".join(lines).strip()
@@ -714,12 +816,12 @@ def check_user_positions_only(safe_address: str = None) -> str:
         return "Safe wallet is not deployed yet.\nDeploy Safe first to track positions."
 
     checker = BalanceChecker()
-    positions = checker.get_positions_via_dome(safe_address)
+    snapshot = checker.get_positions_snapshot_via_dome(safe_address)
 
-    if positions is None:
+    if snapshot is None:
         return "Could not load positions from Dome API right now.\nPlease try again in a few seconds."
 
-    return format_positions_only_message(positions)
+    return format_positions_only_message(snapshot)
 
 
 # Helper function
