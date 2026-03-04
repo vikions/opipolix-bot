@@ -276,18 +276,6 @@ class BalanceChecker:
 
         return metrics
 
-    def get_realized_pnl_via_dome(self, wallet_address: str) -> Optional[float]:
-        """Fetch realized PnL from Dome wallet PnL endpoint."""
-        wallet = str(wallet_address or "").strip().lower()
-        if not wallet or not self.dome_client:
-            return None
-
-        try:
-            return self.dome_client.get_wallet_realized_pnl(wallet)
-        except Exception as e:
-            print(f"Dome realized PnL unavailable: {e}")
-            return None
-
     def get_positions_snapshot_via_dome(self, proxy_wallet: str) -> Dict | None:
         """
         Fetch positions via Dome and estimate USD values using Dome market-price.
@@ -312,7 +300,6 @@ class BalanceChecker:
         outcomes_with_pnl = 0
 
         token_metrics = self.get_position_metrics_via_polymarket(proxy_wallet)
-        realized_pnl_usd = self.get_realized_pnl_via_dome(proxy_wallet)
 
         for market_name, market_positions in positions.items():
             for side in ("yes", "no"):
@@ -367,7 +354,6 @@ class BalanceChecker:
             "outcomes_with_position": outcomes_with_position,
             "outcomes_with_price": outcomes_with_price,
             "outcomes_with_pnl": outcomes_with_pnl,
-            "realized_pnl_usd": realized_pnl_usd,
             "price_source": "dome_market_price",
             "pnl_source": "polymarket_positions",
         }
@@ -902,7 +888,6 @@ def format_positions_only_message(data: Dict) -> str:
     pnl_percent_values = data.get("pnl_percent_values", {})
     total_usd = float(data.get("total_usd", 0) or 0)
     open_pnl_usd = float(data.get("total_pnl_usd", 0) or 0)
-    realized_pnl_usd = data.get("realized_pnl_usd")
     outcomes_with_position = int(data.get("outcomes_with_position", 0) or 0)
     outcomes_with_price = int(data.get("outcomes_with_price", 0) or 0)
     outcomes_with_pnl = int(data.get("outcomes_with_pnl", 0) or 0)
@@ -973,28 +958,6 @@ def format_positions_only_message(data: Dict) -> str:
         lines.append(f"Open PnL: {fmt_signed_amount(open_pnl_usd)}")
     else:
         lines.append("Open PnL: N/A")
-
-    # Keep formatting logic local without relying on class methods.
-    realized_value: Optional[float] = None
-    if isinstance(realized_pnl_usd, (int, float)):
-        realized_value = float(realized_pnl_usd)
-    elif isinstance(realized_pnl_usd, str):
-        cleaned = realized_pnl_usd.replace(",", "").replace("$", "").strip()
-        try:
-            realized_value = float(cleaned)
-        except Exception:
-            realized_value = None
-    else:
-        realized_value = None
-
-    if realized_value is not None:
-        lines.append(f"Realized PnL: {fmt_signed_amount(realized_value)}")
-    else:
-        lines.append("Realized PnL: N/A")
-
-    if outcomes_with_pnl > 0 or realized_value is not None:
-        net_pnl = (open_pnl_usd if outcomes_with_pnl > 0 else 0.0) + (realized_value or 0.0)
-        lines.append(f"Net PnL: {fmt_signed_amount(net_pnl)}")
 
     if outcomes_with_price < outcomes_with_position:
         lines.append(f"Value coverage: {outcomes_with_price}/{outcomes_with_position}")

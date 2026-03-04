@@ -92,7 +92,8 @@ class DomeClient:
     def get_positions_by_wallet(self, wallet_address: str, limit: int = 100) -> List[Dict]:
         """Fetch all Polymarket positions for wallet via Dome API with pagination."""
         normalized_wallet = (wallet_address or "").lower()
-        per_page = max(1, min(int(limit or 100), 100))
+        # Keep page size moderate to reduce gateway failures on large payloads.
+        per_page = max(1, min(int(limit or 100), 50))
 
         all_positions: List[Dict] = []
         pagination_key: Optional[str] = None
@@ -118,13 +119,35 @@ class DomeClient:
                 seen_pagination_keys.add(pagination_key)
                 params["pagination_key"] = pagination_key
 
-            response = requests.get(
-                f"{self.base_url}/polymarket/positions/wallet/{normalized_wallet}",
-                headers=self.headers,
-                params=params,
-                timeout=10,
-            )
-            response.raise_for_status()
+            response = None
+            last_error: Optional[Exception] = None
+            for attempt in range(3):
+                try:
+                    response = requests.get(
+                        f"{self.base_url}/polymarket/positions/wallet/{normalized_wallet}",
+                        headers=self.headers,
+                        params=params,
+                        timeout=10,
+                    )
+                    response.raise_for_status()
+                    last_error = None
+                    break
+                except requests.exceptions.RequestException as exc:
+                    last_error = exc
+                    status = None
+                    if getattr(exc, "response", None) is not None:
+                        status = exc.response.status_code
+
+                    retryable = status in {429, 500, 502, 503, 504} or status is None
+                    if retryable and attempt < 2:
+                        time.sleep(0.9 * (2 ** attempt))
+                        continue
+                    break
+
+            if response is None or last_error is not None:
+                raise last_error if last_error is not None else RuntimeError(
+                    "Dome positions request failed without response"
+                )
 
             data = response.json()
             page_positions = data.get("positions", [])
