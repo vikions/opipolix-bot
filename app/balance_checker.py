@@ -4,6 +4,7 @@ Balance Checker для OpiPoliX бота
 """
 import os
 import time
+import math
 from typing import Dict, Optional
 from web3 import Web3
 from dotenv import load_dotenv
@@ -14,6 +15,7 @@ load_dotenv()
 
 # Polygon RPC (prefer POLY_RPC_URL, keep POLYGON_RPC for backward compatibility)
 POLYGON_RPC = os.environ.get("POLY_RPC_URL") or os.environ.get("POLYGON_RPC", "https://polygon-rpc.com")
+POLY_DATA_API_BASE = os.environ.get("POLY_DATA_API_BASE_URL", "https://data-api.polymarket.com")
 
 # Contract addresses (Polygon Mainnet)
 USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
@@ -179,6 +181,100 @@ class BalanceChecker:
         self._dome_price_cache[token_key] = price
         return price
 
+    @staticmethod
+    def _coerce_float(value: object) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            numeric = float(value)
+            return numeric if math.isfinite(numeric) else None
+        if isinstance(value, str):
+            cleaned = value.replace(",", "").strip()
+            if not cleaned:
+                return None
+            try:
+                numeric = float(cleaned)
+                return numeric if math.isfinite(numeric) else None
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _normalize_percent(value: Optional[float]) -> Optional[float]:
+        """Normalize percent value to percent units (e.g. 0.12 -> 12.0)."""
+        if value is None:
+            return None
+        if -1.0 <= value <= 1.0:
+            return value * 100.0
+        return value
+
+    def get_position_metrics_via_polymarket(
+        self, wallet_address: str
+    ) -> Dict[str, Dict[str, Optional[float]]]:
+        """
+        Fetch per-token metrics from Polymarket Data API.
+        Keeps Dome as source of position sizes, uses this only for PnL/value fields.
+        """
+        wallet = str(wallet_address or "").strip().lower()
+        if not wallet:
+            return {}
+
+        url = f"{POLY_DATA_API_BASE.rstrip('/')}/positions"
+        try:
+            response = requests.get(
+                url,
+                params={"user": wallet, "sizeThreshold": "0", "limit": "500", "offset": "0"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as e:
+            print(f"Polymarket positions metrics unavailable: {e}")
+            return {}
+
+        if not isinstance(payload, list):
+            return {}
+
+        metrics: Dict[str, Dict[str, Optional[float]]] = {}
+
+        for row in payload:
+            if not isinstance(row, dict):
+                continue
+
+            token_id = str(
+                row.get("asset")
+                or row.get("token_id")
+                or row.get("tokenId")
+                or ""
+            ).strip()
+            if not token_id:
+                continue
+
+            current_value = self._coerce_float(row.get("currentValue"))
+            cash_pnl = self._coerce_float(row.get("cashPnl"))
+            percent_pnl = self._normalize_percent(
+                self._coerce_float(row.get("percentPnl"))
+            )
+
+            if token_id not in metrics:
+                metrics[token_id] = {
+                    "current_value": current_value,
+                    "cash_pnl": cash_pnl,
+                    "percent_pnl": percent_pnl,
+                }
+                continue
+
+            # If API returns duplicates per token, keep additive USD fields and latest percent.
+            existing = metrics[token_id]
+            if current_value is not None:
+                existing["current_value"] = (existing.get("current_value") or 0.0) + current_value
+            if cash_pnl is not None:
+                existing["cash_pnl"] = (existing.get("cash_pnl") or 0.0) + cash_pnl
+            if percent_pnl is not None:
+                existing["percent_pnl"] = percent_pnl
+
+        return metrics
+
     def get_positions_snapshot_via_dome(self, proxy_wallet: str) -> Dict | None:
         """
         Fetch positions via Dome and estimate USD values using Dome market-price.
@@ -188,9 +284,21 @@ class BalanceChecker:
             return None
 
         usd_values = self._empty_positions()
+        pnl_usd_values: Dict[str, Dict[str, Optional[float]]] = {
+            market_name: {"yes": None, "no": None}
+            for market_name in MARKET_TOKENS.keys()
+        }
+        pnl_percent_values: Dict[str, Dict[str, Optional[float]]] = {
+            market_name: {"yes": None, "no": None}
+            for market_name in MARKET_TOKENS.keys()
+        }
         total_usd = 0.0
+        total_pnl_usd = 0.0
         outcomes_with_position = 0
         outcomes_with_price = 0
+        outcomes_with_pnl = 0
+
+        token_metrics = self.get_position_metrics_via_polymarket(proxy_wallet)
 
         for market_name, market_positions in positions.items():
             for side in ("yes", "no"):
@@ -205,22 +313,48 @@ class BalanceChecker:
                 if not token_id or token_id == "TBD":
                     continue
 
-                price = self.get_token_price_via_dome(token_id)
-                if price is None:
-                    continue
+                token_key = str(token_id)
+                metric = token_metrics.get(token_key, {})
 
-                usd_value = shares * price
+                metric_value = self._coerce_float(metric.get("current_value"))
+                price = None
+                if metric_value is None or metric_value < 0:
+                    price = self.get_token_price_via_dome(token_id)
+                if metric_value is not None and metric_value >= 0:
+                    usd_value = metric_value
+                elif price is not None:
+                    usd_value = shares * price
+                else:
+                    usd_value = 0.0
+
                 usd_values[market_name][side] = usd_value
-                total_usd += usd_value
-                outcomes_with_price += 1
+                if usd_value > 0:
+                    total_usd += usd_value
+                    outcomes_with_price += 1
+
+                pnl_usd = self._coerce_float(metric.get("cash_pnl"))
+                pnl_percent = self._normalize_percent(
+                    self._coerce_float(metric.get("percent_pnl"))
+                )
+                if pnl_usd is not None:
+                    pnl_usd_values[market_name][side] = pnl_usd
+                    total_pnl_usd += pnl_usd
+                    outcomes_with_pnl += 1
+                if pnl_percent is not None:
+                    pnl_percent_values[market_name][side] = pnl_percent
 
         return {
             "positions": positions,
             "usd_values": usd_values,
+            "pnl_usd_values": pnl_usd_values,
+            "pnl_percent_values": pnl_percent_values,
             "total_usd": total_usd,
+            "total_pnl_usd": total_pnl_usd,
             "outcomes_with_position": outcomes_with_position,
             "outcomes_with_price": outcomes_with_price,
+            "outcomes_with_pnl": outcomes_with_pnl,
             "price_source": "dome_market_price",
+            "pnl_source": "polymarket_positions",
         }
 
     def get_usdc_balance(self, address: str, retry_count: int = 3) -> float:
@@ -749,12 +883,22 @@ def format_usdc_only_message(balance: Dict) -> str:
 def format_positions_only_message(data: Dict) -> str:
     positions = data.get("positions", data)
     usd_values = data.get("usd_values", {})
+    pnl_usd_values = data.get("pnl_usd_values", {})
+    pnl_percent_values = data.get("pnl_percent_values", {})
     total_usd = float(data.get("total_usd", 0) or 0)
+    total_pnl_usd = float(data.get("total_pnl_usd", 0) or 0)
     outcomes_with_position = int(data.get("outcomes_with_position", 0) or 0)
     outcomes_with_price = int(data.get("outcomes_with_price", 0) or 0)
+    outcomes_with_pnl = int(data.get("outcomes_with_pnl", 0) or 0)
 
     lines = ["*Positions*", ""]
     has_positions = False
+
+    def fmt_signed_amount(value: float) -> str:
+        return f"{'+' if value > 0 else ''}${value:.2f}"
+
+    def fmt_signed_percent(value: float) -> str:
+        return f"{'+' if value > 0 else ''}{value:.1f}%"
 
     for market_key in MARKET_TOKENS.keys():
         market_positions = positions.get(market_key, {})
@@ -769,16 +913,30 @@ def format_positions_only_message(data: Dict) -> str:
         lines.append(f"{market_name}:")
         if yes_raw > 0:
             yes_usd = float(usd_values.get(market_key, {}).get("yes", 0) or 0)
-            if yes_usd > 0:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares (~${yes_usd:.2f})")
+            yes_pnl_usd = pnl_usd_values.get(market_key, {}).get("yes")
+            yes_pnl_pct = pnl_percent_values.get(market_key, {}).get("yes")
+            if yes_usd > 0 and yes_pnl_usd is not None and yes_pnl_pct is not None:
+                lines.append(
+                    f"  YES: {yes_raw / 1e6:.2f} shares | ${yes_usd:.2f} | "
+                    f"{fmt_signed_amount(float(yes_pnl_usd))} | {fmt_signed_percent(float(yes_pnl_pct))}"
+                )
+            elif yes_usd > 0:
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares | ${yes_usd:.2f} | PnL: N/A")
             else:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares")
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares | Value: N/A | PnL: N/A")
         if no_raw > 0:
             no_usd = float(usd_values.get(market_key, {}).get("no", 0) or 0)
-            if no_usd > 0:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} shares (~${no_usd:.2f})")
+            no_pnl_usd = pnl_usd_values.get(market_key, {}).get("no")
+            no_pnl_pct = pnl_percent_values.get(market_key, {}).get("no")
+            if no_usd > 0 and no_pnl_usd is not None and no_pnl_pct is not None:
+                lines.append(
+                    f"  NO: {no_raw / 1e6:.2f} shares | ${no_usd:.2f} | "
+                    f"{fmt_signed_amount(float(no_pnl_usd))} | {fmt_signed_percent(float(no_pnl_pct))}"
+                )
+            elif no_usd > 0:
+                lines.append(f"  NO: {no_raw / 1e6:.2f} shares | ${no_usd:.2f} | PnL: N/A")
             else:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} shares")
+                lines.append(f"  NO: {no_raw / 1e6:.2f} shares | Value: N/A | PnL: N/A")
         lines.append("")
 
     if not has_positions:
@@ -792,7 +950,12 @@ def format_positions_only_message(data: Dict) -> str:
     elif outcomes_with_position > 0:
         lines.append("USD valuation is temporarily unavailable.")
 
-    lines.append("Source: Dome API")
+    if has_positions and outcomes_with_pnl > 0:
+        lines.append(f"Total PnL: {fmt_signed_amount(total_pnl_usd)}")
+        if outcomes_with_pnl < outcomes_with_position:
+            lines.append(f"PnL coverage: {outcomes_with_pnl}/{outcomes_with_position}")
+
+    lines.append("Sources: Dome (positions) + Polymarket (PnL)")
     return "\n".join(lines).strip()
 
 
