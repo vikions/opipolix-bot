@@ -222,6 +222,87 @@ class DomeClient:
 
         return self._extract_price_from_payload(payload)
 
+    @staticmethod
+    def _coerce_number(value: object) -> Optional[float]:
+        """Convert unknown payload numeric field to float."""
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            cleaned = value.replace(",", "").replace("$", "").strip()
+            if not cleaned:
+                return None
+            try:
+                return float(cleaned)
+            except ValueError:
+                return None
+        return None
+
+    def _extract_numeric_from_payload(
+        self, payload: object, preferred_keys: List[str]
+    ) -> Optional[float]:
+        """Find first numeric value by preferred keys in nested JSON payload."""
+        preferred = {k.lower() for k in preferred_keys}
+
+        def walk(node: object) -> Optional[float]:
+            if isinstance(node, dict):
+                # Pass 1: preferred keys first
+                for key, value in node.items():
+                    if str(key).lower() in preferred:
+                        parsed = self._coerce_number(value)
+                        if parsed is not None:
+                            return parsed
+                # Pass 2: recurse
+                for value in node.values():
+                    parsed = walk(value)
+                    if parsed is not None:
+                        return parsed
+            elif isinstance(node, list):
+                for item in node:
+                    parsed = walk(item)
+                    if parsed is not None:
+                        return parsed
+            return None
+
+        return walk(payload)
+
+    def get_wallet_realized_pnl(self, wallet_address: str) -> Optional[float]:
+        """
+        Fetch wallet realized PnL from Dome.
+        Endpoint: /polymarket/wallet/pnl/{wallet_address}
+        """
+        wallet = str(wallet_address or "").strip().lower()
+        if not wallet:
+            return None
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/polymarket/wallet/pnl/{wallet}",
+                headers=self.headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[WARN] Dome wallet PnL request failed for {wallet}: {e}")
+            return None
+        except Exception as e:
+            print(f"[WARN] Dome wallet PnL parse failed for {wallet}: {e}")
+            return None
+
+        # Prefer explicit realized keys; fallback to generic pnl key.
+        return self._extract_numeric_from_payload(
+            payload,
+            [
+                "realized_pnl",
+                "realizedPnl",
+                "realized",
+                "wallet_realized_pnl",
+                "pnl",
+            ],
+        )
+
     def search_markets(self, project_name: str, limit: int = 20) -> Dict:
         """
         Search Polymarket markets related to project (synchronous - uses Dome SDK).

@@ -201,11 +201,12 @@ class BalanceChecker:
 
     @staticmethod
     def _normalize_percent(value: Optional[float]) -> Optional[float]:
-        """Normalize percent value to percent units (e.g. 0.12 -> 12.0)."""
+        """
+        Keep percent in API units.
+        Polymarket positions endpoint already returns percent values (e.g. -0.68 means -0.68%).
+        """
         if value is None:
             return None
-        if -1.0 <= value <= 1.0:
-            return value * 100.0
         return value
 
     def get_position_metrics_via_polymarket(
@@ -275,6 +276,18 @@ class BalanceChecker:
 
         return metrics
 
+    def get_realized_pnl_via_dome(self, wallet_address: str) -> Optional[float]:
+        """Fetch realized PnL from Dome wallet PnL endpoint."""
+        wallet = str(wallet_address or "").strip().lower()
+        if not wallet or not self.dome_client:
+            return None
+
+        try:
+            return self.dome_client.get_wallet_realized_pnl(wallet)
+        except Exception as e:
+            print(f"Dome realized PnL unavailable: {e}")
+            return None
+
     def get_positions_snapshot_via_dome(self, proxy_wallet: str) -> Dict | None:
         """
         Fetch positions via Dome and estimate USD values using Dome market-price.
@@ -299,6 +312,7 @@ class BalanceChecker:
         outcomes_with_pnl = 0
 
         token_metrics = self.get_position_metrics_via_polymarket(proxy_wallet)
+        realized_pnl_usd = self.get_realized_pnl_via_dome(proxy_wallet)
 
         for market_name, market_positions in positions.items():
             for side in ("yes", "no"):
@@ -353,6 +367,7 @@ class BalanceChecker:
             "outcomes_with_position": outcomes_with_position,
             "outcomes_with_price": outcomes_with_price,
             "outcomes_with_pnl": outcomes_with_pnl,
+            "realized_pnl_usd": realized_pnl_usd,
             "price_source": "dome_market_price",
             "pnl_source": "polymarket_positions",
         }
@@ -886,16 +901,21 @@ def format_positions_only_message(data: Dict) -> str:
     pnl_usd_values = data.get("pnl_usd_values", {})
     pnl_percent_values = data.get("pnl_percent_values", {})
     total_usd = float(data.get("total_usd", 0) or 0)
-    total_pnl_usd = float(data.get("total_pnl_usd", 0) or 0)
+    open_pnl_usd = float(data.get("total_pnl_usd", 0) or 0)
+    realized_pnl_usd = data.get("realized_pnl_usd")
     outcomes_with_position = int(data.get("outcomes_with_position", 0) or 0)
     outcomes_with_price = int(data.get("outcomes_with_price", 0) or 0)
     outcomes_with_pnl = int(data.get("outcomes_with_pnl", 0) or 0)
 
-    lines = ["*Positions*", ""]
+    lines = ["*Positions*", "_Format: Shares | Value | PnL $ | PnL %_", ""]
     has_positions = False
 
     def fmt_signed_amount(value: float) -> str:
-        return f"{'+' if value > 0 else ''}${value:.2f}"
+        if value > 0:
+            return f"+${value:.2f}"
+        if value < 0:
+            return f"-${abs(value):.2f}"
+        return "$0.00"
 
     def fmt_signed_percent(value: float) -> str:
         return f"{'+' if value > 0 else ''}{value:.1f}%"
@@ -917,45 +937,70 @@ def format_positions_only_message(data: Dict) -> str:
             yes_pnl_pct = pnl_percent_values.get(market_key, {}).get("yes")
             if yes_usd > 0 and yes_pnl_usd is not None and yes_pnl_pct is not None:
                 lines.append(
-                    f"  YES: {yes_raw / 1e6:.2f} shares | ${yes_usd:.2f} | "
+                    f"  YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | "
                     f"{fmt_signed_amount(float(yes_pnl_usd))} | {fmt_signed_percent(float(yes_pnl_pct))}"
                 )
             elif yes_usd > 0:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares | ${yes_usd:.2f} | PnL: N/A")
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | N/A | N/A")
             else:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} shares | Value: N/A | PnL: N/A")
+                lines.append(f"  YES: {yes_raw / 1e6:.2f} | N/A | N/A | N/A")
         if no_raw > 0:
             no_usd = float(usd_values.get(market_key, {}).get("no", 0) or 0)
             no_pnl_usd = pnl_usd_values.get(market_key, {}).get("no")
             no_pnl_pct = pnl_percent_values.get(market_key, {}).get("no")
             if no_usd > 0 and no_pnl_usd is not None and no_pnl_pct is not None:
                 lines.append(
-                    f"  NO: {no_raw / 1e6:.2f} shares | ${no_usd:.2f} | "
+                    f"  NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | "
                     f"{fmt_signed_amount(float(no_pnl_usd))} | {fmt_signed_percent(float(no_pnl_pct))}"
                 )
             elif no_usd > 0:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} shares | ${no_usd:.2f} | PnL: N/A")
+                lines.append(f"  NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | N/A | N/A")
             else:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} shares | Value: N/A | PnL: N/A")
+                lines.append(f"  NO: {no_raw / 1e6:.2f} | N/A | N/A | N/A")
         lines.append("")
 
     if not has_positions:
         lines.append("No positions found.")
-    elif outcomes_with_price > 0:
+        return "\n".join(lines).strip()
+
+    lines.append("*Summary*")
+    if outcomes_with_price > 0:
         lines.append(f"Estimated value: ${total_usd:.2f}")
-        if outcomes_with_price < outcomes_with_position:
-            lines.append(
-                f"Priced outcomes: {outcomes_with_price}/{outcomes_with_position}"
-            )
-    elif outcomes_with_position > 0:
-        lines.append("USD valuation is temporarily unavailable.")
+    else:
+        lines.append("Estimated value: N/A")
 
-    if has_positions and outcomes_with_pnl > 0:
-        lines.append(f"Total PnL: {fmt_signed_amount(total_pnl_usd)}")
-        if outcomes_with_pnl < outcomes_with_position:
-            lines.append(f"PnL coverage: {outcomes_with_pnl}/{outcomes_with_position}")
+    if outcomes_with_pnl > 0:
+        lines.append(f"Open PnL: {fmt_signed_amount(open_pnl_usd)}")
+    else:
+        lines.append("Open PnL: N/A")
 
-    lines.append("Sources: Dome (positions) + Polymarket (PnL)")
+    # Keep formatting logic local without relying on class methods.
+    realized_value: Optional[float] = None
+    if isinstance(realized_pnl_usd, (int, float)):
+        realized_value = float(realized_pnl_usd)
+    elif isinstance(realized_pnl_usd, str):
+        cleaned = realized_pnl_usd.replace(",", "").replace("$", "").strip()
+        try:
+            realized_value = float(cleaned)
+        except Exception:
+            realized_value = None
+    else:
+        realized_value = None
+
+    if realized_value is not None:
+        lines.append(f"Realized PnL: {fmt_signed_amount(realized_value)}")
+    else:
+        lines.append("Realized PnL: N/A")
+
+    if outcomes_with_pnl > 0 or realized_value is not None:
+        net_pnl = (open_pnl_usd if outcomes_with_pnl > 0 else 0.0) + (realized_value or 0.0)
+        lines.append(f"Net PnL: {fmt_signed_amount(net_pnl)}")
+
+    if outcomes_with_price < outcomes_with_position:
+        lines.append(f"Value coverage: {outcomes_with_price}/{outcomes_with_position}")
+    if outcomes_with_pnl < outcomes_with_position:
+        lines.append(f"Open PnL coverage: {outcomes_with_pnl}/{outcomes_with_position}")
+
     return "\n".join(lines).strip()
 
 
