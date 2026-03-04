@@ -892,7 +892,7 @@ def format_positions_only_message(data: Dict) -> str:
     outcomes_with_price = int(data.get("outcomes_with_price", 0) or 0)
     outcomes_with_pnl = int(data.get("outcomes_with_pnl", 0) or 0)
 
-    lines = ["*Positions*", "_Format: Shares | Value | PnL $ | PnL %_", ""]
+    lines = ["\U0001F4CA *Positions*", "_Format: Shares | Value | PnL $ | PnL %_", ""]
     has_positions = False
 
     def fmt_signed_amount(value: float) -> str:
@@ -905,6 +905,15 @@ def format_positions_only_message(data: Dict) -> str:
     def fmt_signed_percent(value: float) -> str:
         return f"{'+' if value > 0 else ''}{value:.1f}%"
 
+    def pnl_emoji(value: Optional[float]) -> str:
+        if value is None:
+            return "\U0001F539"  # small blue diamond
+        if value > 0:
+            return "\U0001F525"  # fire
+        if value < 0:
+            return "\U0001F614"  # pensive face
+        return "\u27A1\uFE0F"  # right arrow
+
     for market_key in MARKET_TOKENS.keys():
         market_positions = positions.get(market_key, {})
         yes_raw = float(market_positions.get("yes", 0) or 0)
@@ -915,54 +924,58 @@ def format_positions_only_message(data: Dict) -> str:
 
         has_positions = True
         market_name = MARKET_DISPLAY_NAMES.get(market_key, market_key.title())
-        lines.append(f"{market_name}:")
+        lines.append(f"\U0001F539 {market_name}:")
         if yes_raw > 0:
             yes_usd = float(usd_values.get(market_key, {}).get("yes", 0) or 0)
             yes_pnl_usd = pnl_usd_values.get(market_key, {}).get("yes")
             yes_pnl_pct = pnl_percent_values.get(market_key, {}).get("yes")
             if yes_usd > 0 and yes_pnl_usd is not None and yes_pnl_pct is not None:
                 lines.append(
-                    f"  YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | "
+                    f"  {pnl_emoji(float(yes_pnl_usd))} YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | "
                     f"{fmt_signed_amount(float(yes_pnl_usd))} | {fmt_signed_percent(float(yes_pnl_pct))}"
                 )
             elif yes_usd > 0:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | N/A | N/A")
+                lines.append(f"  \U0001F539 YES: {yes_raw / 1e6:.2f} | ${yes_usd:.2f} | N/A | N/A")
             else:
-                lines.append(f"  YES: {yes_raw / 1e6:.2f} | N/A | N/A | N/A")
+                lines.append(f"  \U0001F539 YES: {yes_raw / 1e6:.2f} | N/A | N/A | N/A")
         if no_raw > 0:
             no_usd = float(usd_values.get(market_key, {}).get("no", 0) or 0)
             no_pnl_usd = pnl_usd_values.get(market_key, {}).get("no")
             no_pnl_pct = pnl_percent_values.get(market_key, {}).get("no")
             if no_usd > 0 and no_pnl_usd is not None and no_pnl_pct is not None:
                 lines.append(
-                    f"  NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | "
+                    f"  {pnl_emoji(float(no_pnl_usd))} NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | "
                     f"{fmt_signed_amount(float(no_pnl_usd))} | {fmt_signed_percent(float(no_pnl_pct))}"
                 )
             elif no_usd > 0:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | N/A | N/A")
+                lines.append(f"  \U0001F539 NO: {no_raw / 1e6:.2f} | ${no_usd:.2f} | N/A | N/A")
             else:
-                lines.append(f"  NO: {no_raw / 1e6:.2f} | N/A | N/A | N/A")
+                lines.append(f"  \U0001F539 NO: {no_raw / 1e6:.2f} | N/A | N/A | N/A")
         lines.append("")
 
     if not has_positions:
-        lines.append("No positions found.")
+        lines.append("\U0001F4ED No positions found.")
         return "\n".join(lines).strip()
 
-    lines.append("*Summary*")
+    lines.append("*\U0001F4C8 Summary*")
     if outcomes_with_price > 0:
-        lines.append(f"Estimated value: ${total_usd:.2f}")
+        lines.append(f"\U0001F4B0 Estimated value: ${total_usd:.2f}")
     else:
-        lines.append("Estimated value: N/A")
+        lines.append("\U0001F4B0 Estimated value: N/A")
 
     if outcomes_with_pnl > 0:
-        lines.append(f"Open PnL: {fmt_signed_amount(open_pnl_usd)}")
+        lines.append(f"{pnl_emoji(open_pnl_usd)} Open PnL: {fmt_signed_amount(open_pnl_usd)}")
     else:
-        lines.append("Open PnL: N/A")
+        lines.append("\U0001F539 Open PnL: N/A")
 
     if outcomes_with_price < outcomes_with_position:
-        lines.append(f"Value coverage: {outcomes_with_price}/{outcomes_with_position}")
+        lines.append(
+            f"\U0001F50E Value coverage: {outcomes_with_price}/{outcomes_with_position}"
+        )
     if outcomes_with_pnl < outcomes_with_position:
-        lines.append(f"Open PnL coverage: {outcomes_with_pnl}/{outcomes_with_position}")
+        lines.append(
+            f"\U0001F50E Open PnL coverage: {outcomes_with_pnl}/{outcomes_with_position}"
+        )
 
     return "\n".join(lines).strip()
 
